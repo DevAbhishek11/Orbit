@@ -4,19 +4,39 @@
  * One round trip per check: ZREMRANGEBYSCORE (drop expired) → ZCARD (count)
  * → ZADD (register hit) → PEXPIRE (housekeeping).
  *
- * Failure posture:
- *  - reads/general tiers FAIL OPEN when Redis is down (availability > strictness)
- *  - auth tier FAILS CLOSED (security > availability) → 503 DEPENDENCY_UNAVAILABLE
+ * Failure posture — two different situations, two different answers:
+ *  1. Redis is CONFIGURED but unreachable/erroring:
+ *       - auth tier FAILS CLOSED (security > availability) → 503
+ *       - other tiers FAIL OPEN (availability > strictness)
+ *  2. Redis is NOT CONFIGURED at all (REDIS_CACHE_URL empty — the documented
+ *     "Mongo-only" local dev mode): the limiter is deliberately absent, so it
+ *     fails OPEN on every tier. Failing closed here would make the whole API
+ *     (including login) return 503 in the very mode server.ts advertises as
+ *     "running without cache". It is logged loudly once per tier.
  */
 import type { RequestHandler } from 'express';
 import type { RateLimitTier } from '@orbit/shared';
 import { RATE_LIMIT_TIERS } from '@orbit/shared';
+import { env } from '../config/env.js';
 import { dependencyUnavailable, rateLimited } from '../infrastructure/errors/ApiError.js';
 import { childLogger } from '../infrastructure/logger/index.js';
 import { getCacheClient } from '../infrastructure/redis/cacheClient.js';
 import { rateLimitHitsTotal } from '../infrastructure/metrics/index.js';
 
 const log = childLogger({ module: 'rate-limit' });
+
+const redisConfigured = Boolean(env.REDIS_CACHE_URL);
+const warnedTiers = new Set<string>();
+
+/** Log "limiter disabled" once per tier so the log stays readable. */
+function warnNoLimiterOnce(tier: RateLimitTier): void {
+  if (warnedTiers.has(tier)) return;
+  warnedTiers.add(tier);
+  log.warn(
+    { tier },
+    'REDIS_CACHE_URL is not set — rate limiting is DISABLED for this tier (fail-open). Set REDIS_CACHE_URL to enforce limits.',
+  );
+}
 
 const SLIDING_WINDOW_LUA = `
 local key = KEYS[1]
@@ -58,6 +78,12 @@ export function rateLimit(options: RateLimitOptions): RequestHandler {
   return async (req, _res, next) => {
     const client = getCacheClient();
     if (!client) {
+      if (!redisConfigured && env.NODE_ENV !== 'production') {
+        // No Redis at all → limiter intentionally absent (local Mongo-only dev).
+        warnNoLimiterOnce(options.tier);
+        next();
+        return;
+      }
       if (failClosed) {
         log.error({ tier: options.tier }, 'rate limiter fail-CLOSED: redis-cache unreachable');
         next(dependencyUnavailable('rate-limiter'));

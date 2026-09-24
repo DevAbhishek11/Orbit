@@ -73,7 +73,7 @@ export async function updateList(req: Request, res: Response): Promise<void> {
 
 export async function deleteList(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const force = req.query.force === 'true';
+  const force = (req.query as unknown as { force: boolean }).force;
   await service.deleteListWithGuard(String(req.params.id), auth.workspaceId!, force, {
     userId: auth.userId,
     role: auth.role!,

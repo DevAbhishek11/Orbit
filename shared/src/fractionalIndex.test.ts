@@ -54,7 +54,7 @@ describe('fractionalIndex', () => {
   });
 
   it('always lands strictly between neighbours and exhausts the gap eventually', () => {
-    let a = 'V';
+    const a = 'V';
     let b = incrementKey(a);
     let squeezed = 0;
     let exhausted = false;

@@ -80,6 +80,21 @@ export async function updatePasswordHash(userId: string, passwordHash: string): 
   ).exec();
 }
 
+/** Self-service profile patch — dotted paths so `preferences.x` merges in place. */
+export async function updateUserProfile(
+  userId: string,
+  update: Record<string, unknown>,
+): Promise<UserDoc | null> {
+  const doc = await UserModel.findOneAndUpdate(
+    { _id: userId },
+    { $set: update },
+    { new: true },
+  )
+    .lean<UserDoc>()
+    .exec();
+  return doc ?? null;
+}
+
 export async function bumpTokenVersion(userId: string, session?: ClientSession): Promise<void> {
   await UserModel.updateOne({ _id: userId }, { $inc: { tokenVersion: 1 } }, { session }).exec();
 }

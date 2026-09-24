@@ -22,6 +22,21 @@ export async function findCardById(id: string, session?: ClientSession): Promise
   return ((session ? q.session(session) : q).lean<CardDoc>().exec()) ?? null;
 }
 
+/**
+ * Trash lookup: finds a card even when it is soft-deleted.
+ * Used by the restore route, whose authorize() loader must be able to SEE the
+ * deleted document (the default query scope hides it, which made
+ * POST /cards/:id/restore unreachable — a deleted card always answered 404).
+ */
+export async function findCardByIdIncludingDeleted(
+  id: string,
+  session?: ClientSession,
+): Promise<CardDoc | null> {
+  const q = CardModel.findOne({ _id: id }).withDeleted();
+  const scoped = session ? q.session(session) : q;
+  return (await scoped.lean<CardDoc>().exec()) ?? null;
+}
+
 /** Tenant guard baked into the query — cross-tenant reads answer null → 404. */
 export async function findCardByIdScoped(
   id: string,
@@ -119,7 +134,7 @@ export async function listCards(
   if (pagination.sortByListOrder !== false) {
     if (cursorPayload) Object.assign(filter, buildSeekFilter('order', 1, cursorPayload));
     const rows = await CardModel.find(filter)
-      .sort({ listId: 1, order: 1, _id: 1 })
+      .sort({ order: 1, _id: 1 })
       .limit(limit + 1)
       .lean<CardDoc[]>()
       .exec();

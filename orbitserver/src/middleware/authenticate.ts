@@ -5,9 +5,9 @@
  * → attach req.auth + enrich the request context.
  */
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { AUTH, COOKIES } from '@orbit/shared';
+import { COOKIES } from '@orbit/shared';
 import { unauthenticated } from '../infrastructure/errors/ApiError.js';
-import { cacheDel, cacheGet, cacheSet } from '../infrastructure/cache/cacheService.js';
+import { cacheDel } from '../infrastructure/cache/cacheService.js';
 import { enrichRequestContext } from '../infrastructure/logger/requestContext.js';
 import { isJtiDenylisted, verifyAccessToken, type AccessTokenClaims } from '../modules/auth/tokens.service.js';
 import { getAuthSnapshot } from '../modules/users/users.repository.js';
@@ -28,13 +28,7 @@ export async function invalidateAuthSnapshot(userId: string): Promise<void> {
 }
 
 async function loadSnapshot(userId: string): Promise<{ tokenVersion: number; status: string } | null> {
-  const cached = await cacheGet<{ tokenVersion: number; status: string }>(snapshotCacheKey(userId));
-  if (cached) return cached.value;
-  const fresh = await getAuthSnapshot(userId);
-  if (fresh) {
-    await cacheSet(snapshotCacheKey(userId), fresh, { ttlSeconds: AUTH.SESSION_CACHE_TTL_SECONDS });
-  }
-  return fresh;
+  return getAuthSnapshot(userId);
 }
 
 export function authenticate(options: { required?: boolean } = {}): RequestHandler {

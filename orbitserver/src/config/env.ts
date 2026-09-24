@@ -87,6 +87,9 @@ const schema = z.object({
   METRICS_ENABLED: booleanish.default('true'),
   METRICS_TOKEN: z.string().default('internal-scrape-token'),
   HEALTH_DETAILED: booleanish.default('true'),
+
+  // ── Seed (scripts/seed.ts) ──────────────────────────────────────────
+  SEED_DEMO_PASSWORD: z.string().min(12).default('Orbit@1234567'),
 });
 
 export type Env = z.infer<typeof schema>;

@@ -121,7 +121,7 @@ export async function listBoardsForUser(
 ): Promise<unknown[]> {
   return getOrSet(
     `ws:${workspaceId}:boards:${userId}:${includeArchived ? 'all' : 'active'}`,
-    () => listBoards(workspaceId, { includeArchived, userId }),
+    async () => (await listBoards(workspaceId, { includeArchived, userId })).map(serializeBoard),
     { ttlSeconds: 60, tags: [`ws:${workspaceId}:boards`] },
   );
 }
@@ -241,7 +241,7 @@ export async function deleteBoardSoft(
   const board = await loadBoardOr404(boardIdRaw, workspaceId);
   await runInTransaction(
     async (tx) => {
-      await softDeleteBoard(boardIdRaw, workspaceId, actor.userId);
+      await softDeleteBoard(boardIdRaw, workspaceId, actor.userId, tx.session);
       await incWorkspaceStats(workspaceId, { boardCount: -1 }, tx.session);
       await recordAudit({
         actorId: actor.userId,

@@ -19,4 +19,13 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Context modules intentionally export the provider component AND its
+    // `useX` hook together — splitting them would only add an import hop.
+    // Fast-refresh boundaries do not matter for files with no default export.
+    files: ['src/state/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

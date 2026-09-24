@@ -38,6 +38,7 @@ import {
   createMember,
   createWorkspace,
   findInvitationByTokenHash,
+  findInvitationsByWorkspace,
   findMembership,
   findMembers,
   findMembershipsByUser,
@@ -226,7 +227,14 @@ export async function updateWorkspaceSettings(
   if (input.name !== undefined) update.name = input.name;
   if (input.slug !== undefined) update.slug = input.slug;
   if (input.logoUrl !== undefined) update.logoUrl = input.logoUrl;
-  if (input.settings !== undefined) update.settings = input.settings;
+  if (input.settings !== undefined) {
+    // MERGE, never replace: `$set: { settings: {...} }` overwrites the whole
+    // sub-document, so a partial patch (e.g. only `timezone`) would silently
+    // drop weekStart/defaultRole — Mongoose applies defaults on insert only.
+    const current = await findWorkspaceById(workspaceId);
+    if (!current) throw notFound('Workspace');
+    update.settings = { ...current.settings, ...input.settings };
+  }
 
   const updated = await updateWorkspace(workspaceId, update);
   if (!updated) throw notFound('Workspace');
@@ -302,13 +310,19 @@ export async function updateMember(
 
   if (input.role && input.role !== target.role) {
     if (target.role === 'owner') throw lastOwnerProtected();
-    if (RoleRank[actor.role] <= RoleRank[target.role] && actor.userId !== targetUserId) {
+    // Nobody edits their own role — ownership moves only via transfer-ownership,
+    // and a self-service role change would be a privilege-escalation shortcut.
+    if (actor.userId === targetUserId) {
+      throw forbiddenRole('You cannot change your own role — ask another owner or admin');
+    }
+    if (RoleRank[actor.role] <= RoleRank[target.role]) {
       throw forbiddenRole('You cannot change the role of an equal or higher-ranked member');
     }
     await updateMemberRole(workspaceId, targetUserId, input.role);
   }
   if (input.status && input.status !== target.status) {
     if (target.role === 'owner') throw lastOwnerProtected();
+    if (RoleRank[actor.role] <= RoleRank[target.role]) throw forbiddenRole();
     await setMemberStatus(workspaceId, targetUserId, input.status);
   }
 
@@ -458,10 +472,17 @@ export async function inviteMember(
   workspaceId: string,
   input: InviteInput,
   actor: { userId: string; role: Role },
-): Promise<{ invited: true; email: string; role: string; expiresAt: Date }> {
+): Promise<{
+  invited: true;
+  email: string;
+  role: string;
+  expiresAt: Date;
+  acceptToken?: string;
+}> {
   const workspace = await findWorkspaceById(workspaceId);
   if (!workspace) throw notFound('Workspace');
 
+  if (RoleRank[input.role] >= RoleRank[actor.role]) throw forbiddenRole('You can only invite a lower-ranked role');
   const memberCount = await countMembers(workspaceId);
   if (memberCount >= workspace.seatLimit) throw seatLimitReached();
 
@@ -500,7 +521,35 @@ export async function inviteMember(
     after: { email: input.email, role: input.role },
   });
 
-  return { invited: true, email: input.email, role: input.role, expiresAt };
+  // The raw token exists ONLY here — the database keeps its SHA-256 hash.
+  // SMTP is not wired until the mail queue lands, so outside production we
+  // hand the token back to the inviter to keep the invite → accept flow
+  // testable end to end. Production returns nothing extra: email is the only
+  // delivery channel there.
+  const acceptToken = env.NODE_ENV === 'production' ? undefined : raw;
+
+  return { invited: true, email: input.email, role: input.role, expiresAt, acceptToken };
+}
+
+/** Invitations for a workspace, with a derived state the UI can render. */
+export async function listInvitations(workspaceId: string): Promise<unknown[]> {
+  const invitations = await findInvitationsByWorkspace(workspaceId);
+  const now = Date.now();
+  return invitations.map((invite) => ({
+    id: String(invite._id),
+    email: invite.email,
+    role: invite.role,
+    invitedBy: invite.invitedBy,
+    createdAt: invite.createdAt,
+    expiresAt: invite.expiresAt,
+    state: invite.acceptedAt
+      ? 'accepted'
+      : invite.declinedAt
+        ? 'declined'
+        : invite.expiresAt.getTime() <= now
+          ? 'expired'
+          : 'pending',
+  }));
 }
 
 /** T6 — accept invite: idempotent, transactional membership upsert. */

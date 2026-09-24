@@ -80,3 +80,21 @@ Verification before PR:
 
 Remaining work includes backend tests/coverage, transaction and tenant-isolation
 review, service file-size/layering cleanup, and the later product phases.
+
+## 2026-09-24 — API review and frontend implementation
+
+API-backed frontend added for the existing modules, along with targeted server
+corrections, regression tests, database helper scripts and local-infrastructure
+Compose. See RUNNING.md and AUDIT.md for exact scope. Phases remain partial:
+no Atlas CRUD proof, no browser E2E proof, and later product phases remain absent.
+
+### Frontend experience refresh
+
+Added a workspace overview using returned board/member counters, client-side
+board search and sorting, browser-local favorites, grid/list views and refresh.
+Added a public service-status screen consuming the readiness API, improved auth
+page styling, responsive drawer navigation, focus styles and reduced-motion
+support. Favorites are local browser preferences, not synchronized server data.
+Board search/filtering operates on the existing board collection API response.
+Build and frontend lint pass; live authenticated browser flows still require a
+reachable database.

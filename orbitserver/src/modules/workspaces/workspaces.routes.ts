@@ -89,12 +89,18 @@ workspacesRouter.delete(
 );
 
 // Invites.
+workspacesRouter.get(
+  '/:wid/invites',
+  validate({ params: widParams }),
+  authorize('workspace:invite', { workspaceParam: 'wid' }),
+  controller.listInvites,
+);
 workspacesRouter.post(
   '/:wid/invites',
   writeLimit,
   validate({ params: widParams, body: inviteSchema }),
   idempotency(),
-  authorize('workspace:invite'),
+  authorize('workspace:invite', { workspaceParam: 'wid' }),
   controller.inviteMember,
 );
 invitesRouter.use(authenticate());

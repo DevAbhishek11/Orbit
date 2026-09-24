@@ -69,13 +69,14 @@ export async function incBoardStats(
   delta: Partial<Record<keyof IBoard['stats'], number>>,
   session?: ClientSession,
 ): Promise<void> {
-  await BoardModel.updateOne({ _id: id }, { $inc: delta }, { session }).exec();
+  await BoardModel.updateOne({ _id: id }, { $inc: Object.fromEntries(Object.entries(delta).map(([key, value]) => [`stats.${key}`, value])) }, { session }).exec();
 }
 
-export async function softDeleteBoard(id: string, workspaceId: string, actorId: string): Promise<boolean> {
+export async function softDeleteBoard(id: string, workspaceId: string, actorId: string, session?: ClientSession): Promise<boolean> {
   const result = await BoardModel.findOneAndUpdate(
     { _id: id, workspaceId },
     { $set: { deletedAt: new Date(), deletedBy: actorId, archivedAt: new Date() } },
+    { session },
   ).exec();
   return result !== null;
 }

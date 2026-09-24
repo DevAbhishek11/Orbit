@@ -2,23 +2,32 @@
   "name": "orbit-workspace",
   "version": "0.1.0",
   "private": true,
-  "description": "Orbit — Docs, Boards, Chat. One workspace. (npm workspaces monorepo)",
+  "description": "Orbit \u2014 Docs, Boards, Chat. One workspace. (npm workspaces monorepo)",
   "workspaces": [
     "shared",
     "orbitserver",
     "orbit"
   ],
   "scripts": {
+    "dev": "npm run build:shared && concurrently -k -n api,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev --workspace=orbitserver",
+    "dev:web": "npm run dev --workspace=orbit",
     "build": "npm run build --workspace=shared && npm run build --workspace=orbitserver && npm run build --workspace=orbit",
     "build:shared": "npm run build --workspace=shared",
-    "dev:server": "npm run build --workspace=shared && npm run dev --workspace=orbitserver",
-    "dev:web": "npm run dev --workspace=orbit",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "start": "npm run start --workspace=orbitserver",
+    "sync-indexes": "npm run sync-indexes --workspace=orbitserver",
+    "seed": "npm run seed --workspace=orbitserver",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run build --workspace=shared && npm run test --workspaces --if-present",
-    "test:server": "npm run test --workspace=orbitserver"
+    "test": "npm run test --workspaces --if-present",
+    "test:server": "npm run test --workspace=orbitserver",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "check-db": "npm run build:shared && npm run check-db -w orbitserver"
   },
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

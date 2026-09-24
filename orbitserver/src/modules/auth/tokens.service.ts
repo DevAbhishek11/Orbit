@@ -205,9 +205,9 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
   return { ok: true, rawToken: issued.rawToken, record: rotated.toObject(), familyId: record.familyId };
 }
 
-export async function revokeFamily(familyId: string, reason: string): Promise<void> {
+export async function revokeFamily(familyId: string, reason: string, userId?: string): Promise<void> {
   await RefreshTokenModel.updateMany(
-    { familyId, revokedAt: null },
+    { familyId, revokedAt: null, ...(userId ? { userId } : {}) },
     { $set: { revokedAt: new Date(), revokedReason: reason } },
   ).exec();
 }

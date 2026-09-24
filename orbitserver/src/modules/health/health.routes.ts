@@ -36,6 +36,6 @@ healthRouter.get('/metrics', async (req, res) => {
 
 // A tiny route used by the middleware proof: throws on demand so the error
 // envelope + requestId correlation can be verified end-to-end (Phase 2 AC).
-healthRouter.get('/debug/throw', () => {
+if (env.NODE_ENV !== 'production') healthRouter.get('/debug/throw', () => {
   throw new Error('synthetic failure for error-envelope proof');
 });
