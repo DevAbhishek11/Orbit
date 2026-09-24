@@ -1,0 +1,26 @@
+name: Docs
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  check-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check docs exist
+        run: |
+          test -f README.md
+          test -f Docs/BUILD_PROMPT.md
+          test -f Docs/PROJECT_PLAN.md
+          test -f Docs/PROGRESS.md
+          test -f Docs/RUNNING.md
+          test -f Docs/AUDIT.md
+      - name: Check OpenAPI
+        run: |
+          if [ -f orbitserver/scripts/generateOpenApi.ts ]; then
+            echo "OpenAPI generator present"
+          else
+            echo "OpenAPI generator not yet implemented — placeholder"
+          fi

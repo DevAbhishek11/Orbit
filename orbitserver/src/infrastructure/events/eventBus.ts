@@ -1,9 +1,7 @@
 /**
- * Post-commit event bus (BUILD_PROMPT Phase 9 seam).
- *
- * Services call `emitSafe(room, event, payload)` AFTER their transaction
- * commits — never inside it. Until the Socket.io gateway lands (Phase 9),
- * this is a logged no-op; swapping in the real gateway touches only this file.
+ * Post-commit event bus (BUILD_PROMPT Phase 9):
+ * Delegates to realtime socket server when available, otherwise logs.
+ * Services MUST call emitSafe AFTER transaction commits — never inside it.
  */
 import { childLogger } from '../logger/index.js';
 import { getRequestContext } from '../logger/requestContext.js';
@@ -15,7 +13,8 @@ export type SocketRoom =
   | `workspace:${string}`
   | `board:${string}`
   | `channel:${string}`
-  | `page:${string}`;
+  | `page:${string}`
+  | `typing:${string}`;
 
 export interface EmitPayload {
   /** Echoed so the acting client can ignore its own event. */
@@ -23,8 +22,30 @@ export interface EmitPayload {
   [key: string]: unknown;
 }
 
+let emitImpl: ((room: string, event: string, payload: Record<string, unknown>) => void) | null = null;
+
+export function setEmitImplementation(
+  impl: (room: string, event: string, payload: Record<string, unknown>) => void,
+): void {
+  emitImpl = impl;
+}
+
 export function emitSafe(room: SocketRoom, event: string, payload: EmitPayload = {}): void {
   const ctx = getRequestContext();
-  // Phase 9: io.to(room).emit(event, payload) wrapped in try/catch + metrics.
-  log.debug({ room, event, requestId: ctx.requestId, keys: Object.keys(payload) }, 'socket emit (stub)');
+  try {
+    if (emitImpl) {
+      emitImpl(room, event, payload);
+    } else {
+      // Lazy import to avoid circular deps — fallback to dynamic socket server
+      import('../../realtime/socket.server.js')
+        .then((mod) => {
+          mod.emitSafe(room, event, payload);
+        })
+        .catch(() => {
+          log.debug({ room, event, requestId: ctx.requestId }, 'socket emit (no impl)');
+        });
+    }
+  } catch (err) {
+    log.warn({ err: (err as Error).message, room, event, requestId: ctx.requestId }, 'emitSafe failed — swallowed');
+  }
 }

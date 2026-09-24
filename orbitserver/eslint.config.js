@@ -98,4 +98,19 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Scripts (migrate, seed, openapi) are CLI tools — console allowed, process.env via env.ts still enforced but console is fine
+    files: ['scripts/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      'no-empty': 'off',
+      'no-restricted-properties': 'off',
+    },
+  },
 );

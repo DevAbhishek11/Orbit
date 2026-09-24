@@ -330,3 +330,167 @@ export const cardsApi = {
       idempotencyKey: idempotencyKey('cmt'),
     }),
 };
+
+// ── Pages / Docs ─────────────────────────────────────────────────────────────
+
+export const pagesApi = {
+  tree: (wid: string) => request<{ pages: import('./types').Page[] }>(`/workspaces/${wid}/pages/tree`),
+
+  get: (pageId: string) => request<{ page: import('./types').Page }>(`/pages/${pageId}`),
+
+  create: (wid: string, body: { title: string; icon?: string | null; cover?: string | null; parentId?: string | null }) =>
+    request<{ page: import('./types').Page }>(`/workspaces/${wid}/pages`, {
+      method: 'POST',
+      body,
+      idempotencyKey: idempotencyKey('page'),
+    }),
+
+  update: (
+    pageId: string,
+    version: number,
+    body: {
+      title?: string;
+      icon?: string | null;
+      cover?: string | null;
+      blocks?: import('./types').PageBlock[];
+      visibility?: 'workspace' | 'private' | 'link';
+    },
+  ) => request<{ page: import('./types').Page }>(`/pages/${pageId}`, { method: 'PATCH', body: { version, ...body } }),
+
+  remove: (pageId: string) => request<{ deletedCount: number }>(`/pages/${pageId}`, { method: 'DELETE' }),
+
+  restore: (pageId: string) => request<{ restoredCount: number }>(`/pages/${pageId}/restore`, { method: 'POST' }),
+
+  toggleFavourite: (pageId: string) =>
+    request<{ isFavourite: boolean }>(`/pages/${pageId}/favourite`, { method: 'POST' }),
+
+  versions: (pageId: string) =>
+    request<{ versions: import('./types').PageVersion[] }>(`/pages/${pageId}/versions`),
+
+  restoreVersion: (pageId: string, versionId: string) =>
+    request<{ page: import('./types').Page }>(`/pages/${pageId}/versions/${versionId}/restore`, {
+      method: 'POST',
+    }),
+};
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+
+export const chatApi = {
+  listChannels: (wid: string) =>
+    request<{ channels: import('./types').Channel[] }>(`/workspaces/${wid}/channels`),
+
+  createChannel: (
+    wid: string,
+    body: { name: string; topic?: string; type?: 'public' | 'private' | 'dm'; memberIds?: string[] },
+  ) =>
+    request<{ channel: import('./types').Channel }>(`/workspaces/${wid}/channels`, {
+      method: 'POST',
+      body,
+      idempotencyKey: idempotencyKey('ch'),
+    }),
+
+  getChannel: (channelId: string) =>
+    request<{ channel: import('./types').Channel }>(`/channels/${channelId}`),
+
+  updateChannel: (channelId: string, body: { name?: string; topic?: string }) =>
+    request<{ channel: import('./types').Channel }>(`/channels/${channelId}`, { method: 'PATCH', body }),
+
+  deleteChannel: (channelId: string) => request<void>(`/channels/${channelId}`, { method: 'DELETE' }),
+
+  listMessages: (channelId: string, limit = 50, before?: string) =>
+    request<{ messages: import('./types').Message[] }>(`/channels/${channelId}/messages`, {
+      query: { limit, before },
+    }),
+
+  sendMessage: (channelId: string, body: { body: string; clientId?: string; parentId?: string | null }) =>
+    request<{ message: import('./types').Message }>(`/channels/${channelId}/messages`, {
+      method: 'POST',
+      body,
+      idempotencyKey: body.clientId || idempotencyKey('msg'),
+    }),
+
+  editMessage: (messageId: string, body: string) =>
+    request<{ message: import('./types').Message }>(`/messages/${messageId}`, {
+      method: 'PATCH',
+      body: { body },
+    }),
+
+  deleteMessage: (messageId: string) => request<void>(`/messages/${messageId}`, { method: 'DELETE' }),
+
+  toggleReaction: (messageId: string, emoji: string) =>
+    request<{ message: import('./types').Message }>(`/messages/${messageId}/reactions`, {
+      method: 'POST',
+      body: { emoji },
+    }),
+
+  thread: (messageId: string) =>
+    request<{ root: import('./types').Message; replies: import('./types').Message[] }>(
+      `/messages/${messageId}/thread`,
+    ),
+
+  markRead: (channelId: string, messageId?: string) =>
+    request<void>(`/channels/${channelId}/read`, { method: 'POST', body: { messageId } }),
+};
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+export const notificationsApi = {
+  list: (unreadOnly = false) =>
+    request<{ notifications: import('./types').NotificationItem[]; unreadCount: number }>(
+      '/notifications',
+      { query: { unreadOnly: unreadOnly ? 'true' : 'false' } },
+    ),
+
+  markRead: (body: { all?: boolean; notificationIds?: string[] }) =>
+    request<{ success: boolean; unreadCount: number }>('/notifications/read', {
+      method: 'POST',
+      body,
+    }),
+
+  summary: () => request<{ unreadCount: number }>('/notifications/summary'),
+};
+
+// ── Search ───────────────────────────────────────────────────────────────────
+
+export const searchApi = {
+  search: (wid: string, q: string, limit = 20) =>
+    request<import('./types').SearchResponse>(`/workspaces/${wid}/search`, { query: { q, limit } }),
+
+  suggestions: (wid: string) =>
+    request<{ suggestions: { boards: Array<{ id: string; title: string; type: string }>; pages: Array<{ id: string; title: string; icon?: string | null; type: string }>; channels: Array<{ id: string; title: string; type: string }> } }>(
+      `/workspaces/${wid}/search/suggestions`,
+    ),
+};
+
+// ── Analytics ────────────────────────────────────────────────────────────────
+
+export const analyticsApi = {
+  workspaceOverview: (wid: string) =>
+    request<{ kpis: import('./types').WorkspaceKpis }>(`/analytics/workspaces/${wid}/overview`),
+
+  boardBurndown: (boardId: string) =>
+    request<import('./types').BoardBurndown>(`/analytics/boards/${boardId}/burndown`),
+};
+
+// ── Files ────────────────────────────────────────────────────────────────────
+
+export const filesApi = {
+  presign: (body: { fileName: string; mimeType: string; size: number; entityType?: string; entityId?: string }) =>
+    request<{ file: { id: string; fileName: string; mimeType: string; size: number; status: string; s3Key: string }; uploadUrl: string }>(
+      '/files/presign',
+      { method: 'POST', body },
+    ),
+
+  confirm: (fileId: string, checksum?: string) =>
+    request<{ file: { id: string; fileName: string; mimeType: string; size: number; status: string } }>(
+      `/files/${fileId}/confirm`,
+      { method: 'POST', body: { checksum } },
+    ),
+
+  get: (fileId: string) =>
+    request<{ file: { id: string; fileName: string; mimeType: string; size: number; status: string; s3Key: string; uploadedBy: string; createdAt: string } }>(
+      `/files/${fileId}`,
+    ),
+
+  remove: (fileId: string) => request<void>(`/files/${fileId}`, { method: 'DELETE' }),
+};

@@ -13,6 +13,7 @@ import * as controller from './cards.controller.js';
 import {
   cardParamsSchema,
   commentSchema,
+  createCardFromMessageSchema,
   createCardSchema,
   cursorQuerySchema,
   listCardsQuerySchema,
@@ -157,4 +158,13 @@ cardsRouter.post(
   idempotency(),
   authorize('card:comment', { load: loadCard }),
   controller.addComment,
+);
+
+cardsRouter.post(
+  '/cards/from-message',
+  authenticate(),
+  writeLimit,
+  validate({ body: createCardFromMessageSchema }),
+  idempotency(),
+  controller.createFromMessage,
 );

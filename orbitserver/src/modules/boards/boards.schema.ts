@@ -170,6 +170,13 @@ export const commentSchema = z.object({
   clientMutationId: z.string().max(64).optional(),
 });
 
+export const createCardFromMessageSchema = z.object({
+  messageId: objectId,
+  boardId: objectId,
+  listId: objectId.optional(),
+  title: z.string().trim().min(1).max(CONTENT.CARD_TITLE_MAX).optional(),
+});
+
 export type CreateBoardInput = z.infer<typeof createBoardSchema>;
 export type UpdateBoardInput = z.infer<typeof updateBoardSchema>;
 export type CreateListInput = z.infer<typeof createListSchema>;
@@ -180,3 +187,4 @@ export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 export type MoveCardInput = z.infer<typeof moveCardSchema>;
 export type ListCardsQuery = z.infer<typeof listCardsQuerySchema>;
 export type CommentInput = z.infer<typeof commentSchema>;
+export type CreateCardFromMessageInput = z.infer<typeof createCardFromMessageSchema>;

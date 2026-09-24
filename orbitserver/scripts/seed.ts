@@ -16,6 +16,8 @@ import { logger } from '../src/infrastructure/logger/index.js';
 import { hashPassword } from '../src/modules/auth/passwords.js';
 import { createBoard, createList } from '../src/modules/boards/boards.repository.js';
 import { createCard } from '../src/modules/cards/cards.repository.js';
+import { createPage } from '../src/modules/pages/pages.repository.js';
+import { createChannel, createMessage } from '../src/modules/chat/chat.repository.js';
 import { createUser, findUserByEmail } from '../src/modules/users/users.repository.js';
 import {
   createMember,
@@ -196,13 +198,88 @@ async function main(): Promise<void> {
     });
   }
 
+  // Seed default pages
+  const welcomePage = await createPage({
+    workspaceId,
+    title: 'Welcome to Orbit',
+    icon: '👋',
+    parentId: null,
+    ancestors: [],
+    depth: 0,
+    order: firstKey(),
+    blocks: [
+      { id: 'b1', type: 'h1', content: 'Welcome to your Orbit Workspace', order: 'V' },
+      { id: 'b2', type: 'paragraph', content: 'Orbit unifies Notion-style Docs, Trello-style Kanban boards, and Slack-style Chat in one connected workspace.', order: 'W' },
+      { id: 'b3', type: 'todo', content: 'Explore the Kanban board', checked: true, order: 'X' },
+      { id: 'b4', type: 'todo', content: 'Send a message in #general', checked: false, order: 'Y' },
+    ],
+    plainText: 'Welcome to your Orbit Workspace. Orbit unifies Notion-style Docs, Trello-style Kanban boards, and Slack-style Chat in one connected workspace.',
+    visibility: 'workspace',
+    createdBy: String(owner._id),
+  });
+
+  await createPage({
+    workspaceId,
+    title: 'Engineering Playbook',
+    icon: '🚀',
+    parentId: String(welcomePage._id),
+    ancestors: [String(welcomePage._id)],
+    depth: 1,
+    order: incrementKey(firstKey()),
+    blocks: [
+      { id: 'pb1', type: 'h2', content: 'Core Architecture', order: 'V' },
+      { id: 'pb2', type: 'paragraph', content: 'Express 5 + Mongoose 8 + Redis dual-tier caching + React 19 / Vite.', order: 'W' },
+    ],
+    plainText: 'Core Architecture. Express 5 + Mongoose 8 + Redis dual-tier caching + React 19 / Vite.',
+    visibility: 'workspace',
+    createdBy: String(owner._id),
+  });
+
+  // Seed default channels
+  const generalChannel = await createChannel({
+    workspaceId,
+    name: 'general',
+    slug: 'general',
+    type: 'public',
+    topic: 'Company-wide discussion and team announcements',
+    memberIds: userIds,
+    createdBy: String(owner._id),
+    messageCount: 2,
+  });
+
+  await createMessage({
+    workspaceId,
+    channelId: String(generalChannel._id),
+    authorId: String(owner._id),
+    body: 'Hello team! Welcome to Orbit. Docs, Boards and Chat are ready for collaboration.',
+  });
+
+  await createMessage({
+    workspaceId,
+    channelId: String(generalChannel._id),
+    authorId: userIds[1]!,
+    body: 'Great to be here! The real-time messaging and boards look great.',
+  });
+
+  await createChannel({
+    workspaceId,
+    name: 'engineering',
+    slug: 'engineering',
+    type: 'public',
+    topic: 'Technical discussions, pull requests, and architecture',
+    memberIds: userIds,
+    createdBy: String(owner._id),
+    messageCount: 0,
+  });
+
   logger.info(
     {
       workspace: SLUG,
       board: board.name,
       lists: listIds.length,
       cards: CARDS.length,
-
+      pages: 2,
+      channels: 2,
     },
     'seed complete — sign in with any of the demo emails',
   );

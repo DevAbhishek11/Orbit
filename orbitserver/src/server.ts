@@ -16,6 +16,8 @@ import { createCacheClient, closeCacheClient } from './infrastructure/redis/cach
 import { createQueueClient, closeQueueClient } from './infrastructure/redis/queueClient.js';
 import { startMetricsCollectors, stopMetricsCollectors } from './infrastructure/metrics/index.js';
 import { createApp } from './app.js';
+import { createSocketServer, emitSafe } from './realtime/socket.server.js';
+import { setEmitImplementation } from './infrastructure/events/eventBus.js';
 
 const SHUTDOWN_DEADLINE_MS = 15_000;
 
@@ -60,6 +62,16 @@ async function boot(): Promise<void> {
   server.requestTimeout = 30_000;
   server.keepAliveTimeout = 60_000;
 
+  // ── Realtime gateway (Socket.io) ─────────────────────────────────
+  try {
+    const io = createSocketServer(server);
+    setEmitImplementation((room, event, payload) => emitSafe(room, event, payload));
+    logger.info('realtime gateway initialized');
+    void io;
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'realtime gateway failed to initialize — continuing without sockets');
+  }
+
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(env.PORT, '0.0.0.0', resolve);
@@ -78,7 +90,9 @@ function installShutdownHandlers(server: http.Server): void {
   const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
-    logger.info({ signal }, 'graceful shutdown started');
+    const isCrash = signal === 'unhandledRejection' || signal === 'uncaughtException';
+    const exitCode = isCrash ? 1 : 0;
+    logger.info({ signal, exitCode }, 'graceful shutdown started');
 
     const hardDeadline = setTimeout(() => {
       logger.fatal('shutdown deadline exceeded — forcing exit');
@@ -96,11 +110,17 @@ function installShutdownHandlers(server: http.Server): void {
 
     logger.info('shutdown complete');
     clearTimeout(hardDeadline);
-    process.exit(0);
+    process.exit(exitCode);
   };
 
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
+
+  process.on('message', (msg: unknown) => {
+    if (typeof msg === 'object' && msg !== null && (msg as { type?: string }).type === 'graceful-shutdown') {
+      void shutdown('cluster-primary');
+    }
+  });
 
   process.on('unhandledRejection', (reason) => {
     logger.fatal({ err: reason }, 'unhandled promise rejection');
