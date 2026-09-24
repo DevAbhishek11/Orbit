@@ -436,7 +436,7 @@ export async function getSessions(userId: string, currentRefreshRaw?: string): P
 }
 
 export async function revokeSession(userId: string, familyId: string): Promise<void> {
-  await revokeFamily(familyId, 'revoked_by_user');
+  await revokeFamily(familyId, 'revoked_by_user', userId);
   await recordAudit({
     actorId: userId,
     action: 'auth.session_revoked',

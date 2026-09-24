@@ -99,6 +99,10 @@ export async function inviteMember(req: Request, res: Response): Promise<void> {
   created(res, result);
 }
 
+export async function listInvites(req: Request, res: Response): Promise<void> {
+  ok(res, { invites: await service.listInvitations(String(req.params.wid)) });
+}
+
 export async function acceptInvite(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
   const user = await loadUserOr404(auth.userId);

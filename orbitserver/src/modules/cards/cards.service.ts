@@ -30,6 +30,7 @@ import { computeChecklistProgress, CardModel } from './cards.model.js';
 import {
   createCard,
   findCardByIdScoped,
+  findCardByIdIncludingDeleted,
   getLastCardOrder,
   findNeighborCards,
   incCardCommentCount,
@@ -316,6 +317,7 @@ export async function moveCard(
   if (crossBoard) {
     const targetBoard = await findBoardByIdScoped(targetList.boardId, workspaceId);
     if (!targetBoard) throw notFound('Board');
+    if (targetBoard.visibility === 'private' && !['owner', 'admin'].includes(actor.role) && targetBoard.createdBy !== actor.userId && !targetBoard.memberIds.includes(actor.userId)) throw notFound('Board');
   }
 
   // Neighbours must live in the TARGET list.
@@ -465,8 +467,13 @@ export async function deleteCardSoft(cardId: string, workspaceId: string, actor:
 }
 
 export async function restoreSoftDeletedCard(cardId: string, workspaceId: string, actor: Actor): Promise<Record<string, unknown>> {
+  // Tenant check BEFORE the write — a cross-tenant id must answer 404 without
+  // touching the document (rule 6: no cross-tenant writes, no enumeration).
+  const existing = await findCardByIdIncludingDeleted(cardId);
+  if (!existing || existing.workspaceId !== workspaceId) throw notFound('Card');
+
   const card = await restoreCard(cardId);
-  if (!card || card.workspaceId !== workspaceId) throw notFound('Card');
+  if (!card) throw notFound('Card');
   await runInTransaction(
     async (tx) => {
       await incListCardCount(card.listId, 1, tx.session);

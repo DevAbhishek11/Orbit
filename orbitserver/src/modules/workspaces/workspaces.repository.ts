@@ -48,7 +48,7 @@ export function incWorkspaceStats(
   delta: Partial<Record<keyof IWorkspace['stats'], number>>,
   session?: ClientSession,
 ): Promise<unknown> {
-  return WorkspaceModel.updateOne({ _id: id }, { $inc: delta }, { session }).exec();
+  return WorkspaceModel.updateOne({ _id: id }, { $inc: Object.fromEntries(Object.entries(delta).map(([key, value]) => [`stats.${key}`, value])) }, { session }).exec();
 }
 
 // ── Memberships ───────────────────────────────────────────────────────
@@ -154,6 +154,18 @@ export function findPendingInvite(
     expiresAt: { $gt: new Date() },
   })
     .lean<IInvitation>()
+    .exec();
+}
+
+/** Invitations for a workspace, newest first (pending first, then history). */
+export function findInvitationsByWorkspace(
+  workspaceId: string,
+  limit = 50,
+): Promise<InvitationDoc[]> {
+  return InvitationModel.find({ workspaceId })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean<InvitationDoc[]>()
     .exec();
 }
 

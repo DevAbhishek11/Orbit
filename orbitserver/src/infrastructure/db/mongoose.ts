@@ -53,21 +53,18 @@ async function probeTopology(conn: mongoose.Connection): Promise<void> {
   if (topology === 'replicaSet' || topology === 'sharded') {
     // Empirical check: some managed tiers (Atlas M0) expose a replica set name
     // yet reject transactions — probe with a throwaway database.
-    const probeDb = mongoose.connection.useDb('orbit_tx_probe');
+    // Probe only the configured database, and abort so no probe data persists.
+    const session = await conn.startSession();
     try {
-      const session = await conn.startSession();
-      try {
-        await session.withTransaction(async () => {
-          await probeDb.collection('probe').insertOne({ probe: true }, { session });
-          await probeDb.collection('probe2').insertOne({ probe: true }, { session });
-        });
-        transactionsSupported = true;
-      } finally {
-        await session.endSession();
-      }
-      await probeDb.dropDatabase().catch(() => undefined);
+      await conn.db!.createCollection('__transaction_probe').catch(() => undefined);
+      session.startTransaction();
+      await conn.collection('__transaction_probe').insertOne({ probe: true }, { session });
+      await session.abortTransaction();
+      transactionsSupported = true;
     } catch (err) {
-      log.warn({ err: (err as Error).message }, 'transaction probe failed — running without transactions');
+      log.warn({ err: (err as Error).message }, 'transaction probe failed');
+    } finally {
+      await session.endSession();
     }
   }
 

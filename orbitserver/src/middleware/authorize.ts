@@ -12,7 +12,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { roleHasPermission, RoleRank, type Permission, type Role, Roles } from '@orbit/shared';
 import { forbiddenRole, notFound, unauthenticated } from '../infrastructure/errors/ApiError.js';
 import { cacheDel, cacheGet, cacheSet } from '../infrastructure/cache/cacheService.js';
-import { findMembership } from '../modules/workspaces/workspaces.repository.js';
+import { findMembership, findWorkspaceById } from '../modules/workspaces/workspaces.repository.js';
 import type { AuthContext } from './requestContext.js';
 import { invalidateAuthSnapshot } from './authenticate.js';
 
@@ -22,6 +22,8 @@ function isRole(value: unknown): value is Role {
 
 /** Cached fresh membership lookup — the source of truth for role checks. */
 export async function getFreshRole(workspaceId: string, userId: string): Promise<Role | null> {
+  const workspace = await findWorkspaceById(workspaceId);
+  if (!workspace || workspace.archivedAt) return null;
   const key = `member:${workspaceId}:${userId}`;
   const cached = await cacheGet<{ role: string | null }>(key);
   if (cached) return isRole(cached.value.role) ? cached.value.role : null;
