@@ -7,13 +7,13 @@ have been run. Update the status column in the same commit as the phase.
 
 | Phase | Scope | Status | Commit | Notes |
 |---|---|---|---|---|
-| 0 | Monorepo bootstrap, config, shared package, env validation, husky | ⬜ | | |
-| 1 | Docker: Mongo replica set, dual Redis, MinIO, Nginx, MailHog | ⬜ | | |
-| 2 | Logger, errors, Mongo/Redis clients, cluster runtime, health, metrics | ⬜ | | |
-| 3 | Auth: argon2id, JWT, rotating refresh, reuse detection, sessions | ⬜ | | |
-| 4 | RBAC, Lua rate limiter, idempotency, validation, audit, soft delete | ⬜ | | |
-| 5 | Workspaces: T1 bootstrap transaction, members, invites, roles | ⬜ | | |
-| 6 | Boards/lists/cards: fractional index, T2 move, filters, activity | ⬜ | | |
+| 0 | Monorepo bootstrap, config, shared package, env validation, husky | 🟨 | | |
+| 1 | Docker: Mongo replica set, dual Redis, MinIO, Nginx, MailHog | 🟨 | | |
+| 2 | Logger, errors, Mongo/Redis clients, cluster runtime, health, metrics | 🟨 | | |
+| 3 | Auth: argon2id, JWT, rotating refresh, reuse detection, sessions | 🟨 | | |
+| 4 | RBAC, Lua rate limiter, idempotency, validation, audit, soft delete | 🟨 | | |
+| 5 | Workspaces: T1 bootstrap transaction, members, invites, roles | 🟨 | | |
+| 6 | Boards/lists/cards: fractional index, T2 move, filters, activity | 🟨 | | |
 | 7 | Pages: nested tree, blocks, autosave conflicts, versions, backlinks, trash | ⬜ | | |
 | 8 | Chat: channels, messages, threads, reactions, unread, presence | ⬜ | | |
 | 9 | Realtime: Socket.io gateway, permissioned rooms, Redis adapter | ⬜ | | |
@@ -56,3 +56,27 @@ have been run. Update the status column in the same commit as the phase.
 | Date | Item | Decision / status |
 |---|---|---|
 | | | |
+
+## 2026-09-24 — Backend foundation snapshot
+
+Phases 0–6 are partially implemented, not acceptance-complete. Existing `orbit/`
+and `orbitserver/` layout retained with npm workspaces and `shared/`. MongoDB
+Atlas replaces local Docker MongoDB; dual Redis development configs included.
+Auth, RBAC, workspace and board/card modules are implemented but need integration
+and security validation before production use. Mail, realtime and queues retain
+stub implementations. Frontend remains the initial scaffold.
+
+Verification before PR:
+- `npm ci --no-audit --no-fund`: passed.
+- `npm run build`: shared, API and frontend builds passed.
+- `npm run test -w shared`: 24/24 tests passed.
+- `npm run lint -w orbitserver`: passed.
+- `npm run test -w orbitserver`: failed in pretest workspace resolution
+  (`No workspaces found: --workspace=shared`); backend tests not yet implemented.
+- Earlier live smoke checks: liveness 200; readiness 503 with Mongo down and
+  Redis up. Atlas connectivity remains blocked; integration tests not verified.
+- Real Atlas URI removed from tracked env example. Local `.env` is ignored.
+  Previously committed Atlas credentials must be rotated; history still contains them.
+
+Remaining work includes backend tests/coverage, transaction and tenant-isolation
+review, service file-size/layering cleanup, and the later product phases.
