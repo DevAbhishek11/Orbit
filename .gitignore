@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment — NEVER commit real credentials
+.env
+.env.*
+!.env.example
+!env.example
+
+# Tests / coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+logs/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local infra data (redis dumps, uploads)
+dump.rdb
+*.aof
+uploads/

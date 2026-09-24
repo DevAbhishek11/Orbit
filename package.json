@@ -1,0 +1,24 @@
+{
+  "name": "orbit-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Orbit — Docs, Boards, Chat. One workspace. (npm workspaces monorepo)",
+  "workspaces": [
+    "shared",
+    "orbitserver",
+    "orbit"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=shared && npm run build --workspace=orbitserver && npm run build --workspace=orbit",
+    "build:shared": "npm run build --workspace=shared",
+    "dev:server": "npm run build --workspace=shared && npm run dev --workspace=orbitserver",
+    "dev:web": "npm run dev --workspace=orbit",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run build --workspace=shared && npm run test --workspaces --if-present",
+    "test:server": "npm run test --workspace=orbitserver"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}
