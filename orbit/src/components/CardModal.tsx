@@ -150,11 +150,11 @@ export function CardModal({
   };
 
   const toggleChecklistItem = (checklistId: string, itemId: string) => {
-    const checklists = card.checklists.map((checklist) =>
+    const checklists = (card.checklists ?? []).map((checklist) =>
       checklist.id === checklistId
         ? {
             ...checklist,
-            items: checklist.items.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item)),
+            items: (checklist.items ?? []).map((item) => (item.id === itemId ? { ...item, done: !item.done } : item)),
           }
         : checklist,
     );
@@ -162,31 +162,32 @@ export function CardModal({
   };
 
   const addChecklist = (title: string) => {
-    const checklists: Checklist[] = [...card.checklists, { id: newId(), title, items: [] }];
+    const checklists: Checklist[] = [...(card.checklists ?? []), { id: newId(), title, items: [] }];
     patch.mutate({ checklists });
   };
 
   const removeChecklist = (checklistId: string) => {
-    patch.mutate({ checklists: card.checklists.filter((checklist) => checklist.id !== checklistId) });
+    patch.mutate({ checklists: (card.checklists ?? []).filter((checklist) => checklist.id !== checklistId) });
   };
 
   const addChecklistItem = (checklistId: string, title: string) => {
-    const checklists = card.checklists.map((checklist) =>
-      checklist.id === checklistId ? { ...checklist, items: [...checklist.items, { id: newId(), title, done: false }] } : checklist,
+    const checklists = (card.checklists ?? []).map((checklist) =>
+      checklist.id === checklistId ? { ...checklist, items: [...(checklist.items ?? []), { id: newId(), title, done: false }] } : checklist,
     );
     patch.mutate({ checklists });
   };
 
   const toggleAssignee = (userId: string) => {
-    const assignees = card.assignees.includes(userId)
-      ? card.assignees.filter((id) => id !== userId)
-      : [...card.assignees, userId];
+    const currentAssignees = card.assignees ?? [];
+    const assignees = currentAssignees.includes(userId)
+      ? currentAssignees.filter((id) => id !== userId)
+      : [...currentAssignees, userId];
     patch.mutate({ assignees });
   };
 
-  const progress = card.checklistProgress.total
-    ? Math.round((card.checklistProgress.done / card.checklistProgress.total) * 100)
-    : 0;
+  const totalItems = card.checklistProgress?.total ?? 0;
+  const doneItems = card.checklistProgress?.done ?? 0;
+  const progress = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
   return (
     <>
@@ -251,7 +252,7 @@ export function CardModal({
             <div className="detail-section">
               <div className="detail-section__title">Labels</div>
               <div className="row row--wrap">
-                {card.labels.map((label) => (
+                {(card.labels ?? []).map((label) => (
                   <span key={label.id} className="row" style={{ gap: 4 }}>
                     <span className="label-chip" style={{ background: label.color }}>
                       {label.name}
@@ -262,14 +263,14 @@ export function CardModal({
                         className="btn btn--ghost btn--icon"
                         style={{ width: 20, height: 20 }}
                         aria-label={`Remove ${label.name}`}
-                        onClick={() => patch.mutate({ labels: card.labels.filter((item) => item.id !== label.id) })}
+                        onClick={() => patch.mutate({ labels: (card.labels ?? []).filter((item) => item.id !== label.id) })}
                       >
                         ×
                       </button>
                     ) : null}
                   </span>
                 ))}
-                {!readOnly && card.labels.length < 6 ? (
+                {!readOnly && (card.labels ?? []).length < 6 ? (
                   labelDraft ? (
                     <span className="row" style={{ gap: 4 }}>
                       <input
@@ -287,7 +288,7 @@ export function CardModal({
                         disabled={!labelDraft.name.trim()}
                         onClick={() => {
                           patch.mutate({
-                            labels: [...card.labels, { id: newId(), name: labelDraft.name.trim(), color: labelDraft.color }],
+                            labels: [...(card.labels ?? []), { id: newId(), name: labelDraft.name.trim(), color: labelDraft.color }],
                           });
                           setLabelDraft(null);
                         }}
@@ -299,7 +300,7 @@ export function CardModal({
                       </button>
                     </span>
                   ) : (
-                    <button type="button" className="btn btn--sm" onClick={() => setLabelDraft({ name: '', color: LABEL_COLORS[card.labels.length % LABEL_COLORS.length]! })}>
+                    <button type="button" className="btn btn--sm" onClick={() => setLabelDraft({ name: '', color: LABEL_COLORS[(card.labels ?? []).length % LABEL_COLORS.length]! })}>
                       + Label
                     </button>
                   )
@@ -309,14 +310,14 @@ export function CardModal({
 
             <div className="detail-section">
               <div className="detail-section__title">
-                Checklists {card.checklistProgress.total > 0 ? `· ${progress}%` : ''}
+                Checklists {totalItems > 0 ? `· ${progress}%` : ''}
               </div>
-              {card.checklistProgress.total > 0 ? (
+              {totalItems > 0 ? (
                 <div className="progress" style={{ marginBottom: 12 }}>
                   <div className="progress__bar" style={{ width: `${progress}%` }} />
                 </div>
               ) : null}
-              {card.checklists.map((checklist) => (
+              {(card.checklists ?? []).map((checklist) => (
                 <div key={checklist.id} style={{ marginBottom: 14 }}>
                   <div className="row row--between">
                     <strong style={{ fontSize: 13 }}>{checklist.title}</strong>
@@ -326,7 +327,7 @@ export function CardModal({
                       </button>
                     ) : null}
                   </div>
-                  {checklist.items.map((item) => (
+                  {(checklist.items ?? []).map((item) => (
                     <label key={item.id} className={`checklist__item${item.done ? ' checklist__item--done' : ''}`}>
                       <input
                         type="checkbox"
@@ -463,7 +464,7 @@ export function CardModal({
                   <label key={member.userId} className="checkbox">
                     <input
                       type="checkbox"
-                      checked={card.assignees.includes(member.userId)}
+                      checked={(card.assignees ?? []).includes(member.userId)}
                       disabled={readOnly || patch.isPending}
                       onChange={() => toggleAssignee(member.userId)}
                     />

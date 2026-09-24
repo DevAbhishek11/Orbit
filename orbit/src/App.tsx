@@ -11,10 +11,15 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './state/auth';
 import { ToastProvider } from './state/toast';
+import { SocketProvider } from './state/socket';
 import { StatusPage } from './routes/StatusPage';
 import { AppShell } from './routes/AppShell';
 import { BoardsPage } from './routes/BoardsPage';
 import { BoardPage } from './routes/BoardPage';
+import { DocsPage } from './routes/DocsPage';
+import { ChatPage } from './routes/ChatPage';
+import { AnalyticsPage } from './routes/AnalyticsPage';
+import { FilesPage } from './routes/FilesPage';
 import { InvitationsPage, MembersPage } from './routes/MembersPage';
 import { SettingsPage } from './routes/SettingsPage';
 import { WorkspacePage } from './routes/WorkspacePage';
@@ -83,8 +88,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthProvider>
-          <ThemeEffect />
-          <Routes>
+          <SocketProvider>
+            <ThemeEffect />
+            <Routes>
             {/* Public */}
             <Route path="/status" element={<StatusPage />} />
             <Route path="/login" element={<RedirectIfAuthed><LoginPage /></RedirectIfAuthed>} />
@@ -105,6 +111,12 @@ export default function App() {
             >
               <Route path="/" element={<BoardsPage />} />
               <Route path="/boards/:boardId" element={<BoardPage />} />
+              <Route path="/docs" element={<DocsPage />} />
+              <Route path="/docs/:pageId" element={<DocsPage />} />
+              <Route path="/chat" element={<ChatPage />} />
+              <Route path="/chat/:channelId" element={<ChatPage />} />
+              <Route path="/files" element={<FilesPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/members" element={<MembersPage />} />
               <Route path="/invitations" element={<InvitationsPage />} />
               <Route path="/workspace" element={<WorkspacePage />} />
@@ -113,6 +125,7 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </SocketProvider>
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>

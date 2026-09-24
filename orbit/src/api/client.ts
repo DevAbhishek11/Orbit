@@ -148,15 +148,29 @@ export async function requestWithMeta<T>(
     if (accessToken) headers.authorization = `Bearer ${accessToken}`;
     if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
 
-    const response = await fetch(buildUrl(path, options.query), {
-      method: options.method ?? 'GET',
-      headers,
-      // Same-origin by construction, but be explicit: the refresh cookie is
-      // path-scoped to /api/v1/auth and must be sent on that call.
-      credentials: 'include',
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
-    });
+    let response: Response;
+    try {
+      response = await fetch(buildUrl(path, options.query), {
+        method: options.method ?? 'GET',
+        headers,
+        // Same-origin by construction, but be explicit: the refresh cookie is
+        // path-scoped to /api/v1/auth and must be sent on that call.
+        credentials: 'include',
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: options.signal,
+      });
+    } catch (networkErr: unknown) {
+      if (options.signal?.aborted) {
+        throw networkErr;
+      }
+      const msg = networkErr instanceof Error ? networkErr.message : 'Network error';
+      throw new ApiError(
+        'NETWORK_ERROR',
+        `Unable to reach server (${msg}). Check your connection or verify backend at /status.`,
+        0,
+        { originalError: msg },
+      );
+    }
 
     if (response.status === 204) {
       return { data: undefined as T, meta: { requestId: response.headers.get('x-request-id') ?? '-' } };

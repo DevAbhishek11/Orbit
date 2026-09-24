@@ -15,6 +15,7 @@
     "build": "npm run build --workspace=shared && npm run build --workspace=orbitserver && npm run build --workspace=orbit",
     "build:shared": "npm run build --workspace=shared",
     "start": "npm run start --workspace=orbitserver",
+    "start:cluster": "npm run start:cluster --workspace=orbitserver",
     "sync-indexes": "npm run sync-indexes --workspace=orbitserver",
     "seed": "npm run seed --workspace=orbitserver",
     "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",

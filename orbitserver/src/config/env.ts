@@ -40,6 +40,7 @@ const schema = z.object({
   GIT_SHA: z.string().optional().default(''),
   APP_VERSION: z.string().optional().default('0.1.0'),
   TRUST_PROXY: booleanish.default('true'),
+  WEB_CONCURRENCY: z.coerce.number().int().min(1).optional(),
 
   // ── Auth ────────────────────────────────────────────────────────────
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),

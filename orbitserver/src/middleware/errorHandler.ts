@@ -44,6 +44,35 @@ function toApiError(err: unknown): ApiError {
       cause: err,
     });
   }
+
+  // Database connectivity / network / server selection errors fail fast with 503 DEPENDENCY_UNAVAILABLE
+  if (err && typeof err === 'object') {
+    const errorObj = err as { name?: string; message?: string };
+    const name = errorObj.name ?? '';
+    const message = errorObj.message ?? '';
+    if (
+      name === 'MongoServerSelectionError' ||
+      name === 'MongoNetworkError' ||
+      name === 'MongoNetworkTimeoutError' ||
+      name === 'MongoTimeoutError' ||
+      name === 'MongoNotConnectedError' ||
+      message.includes('buffering timed out') ||
+      message.includes('topology was destroyed') ||
+      message.includes('connection closed')
+    ) {
+      return new ApiError('DEPENDENCY_UNAVAILABLE', 'Database is temporarily unavailable', {
+        status: 503,
+        cause: err,
+      });
+    }
+  }
+
+  if (err instanceof URIError) {
+    return new ApiError('VALIDATION_ERROR', 'Malformed URI component in request', {
+      status: 400,
+      cause: err,
+    });
+  }
   if (typeof err === 'object' && err !== null && 'code' in err) {
     const mongoErr = err as { code?: number | string; keyValue?: Record<string, unknown> };
     if (mongoErr.code === 11000) {

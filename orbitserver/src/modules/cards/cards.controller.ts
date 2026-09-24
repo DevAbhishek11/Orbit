@@ -5,7 +5,13 @@ import type { Request, Response } from 'express';
 import { created, noContent, ok } from '../../infrastructure/http/response.js';
 import { requireAuth } from '../../middleware/authenticate.js';
 import * as service from './cards.service.js';
-import type { CommentInput, CreateCardInput, MoveCardInput, UpdateCardInput } from '../boards/boards.schema.js';
+import type {
+  CommentInput,
+  CreateCardFromMessageInput,
+  CreateCardInput,
+  MoveCardInput,
+  UpdateCardInput,
+} from '../boards/boards.schema.js';
 
 export async function listCards(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
@@ -84,4 +90,13 @@ export async function addComment(req: Request, res: Response): Promise<void> {
     role: auth.role!,
   });
   created(res, comment);
+}
+
+export async function createFromMessage(req: Request, res: Response): Promise<void> {
+  const auth = requireAuth(req);
+  const card = await service.createCardFromMessage(auth.workspaceId!, req.body as CreateCardFromMessageInput, {
+    userId: auth.userId,
+    role: auth.role!,
+  });
+  created(res, card);
 }

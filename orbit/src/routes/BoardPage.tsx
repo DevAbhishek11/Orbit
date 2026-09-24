@@ -7,7 +7,7 @@
  * inside a transaction. Updates are applied optimistically and rolled back if
  * the server rejects the move (409 VERSION_CONFLICT ⇒ refetch).
  */
-import { useMemo, useState, type DragEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -16,6 +16,8 @@ import type { BoardView, Card } from '../api/types';
 import { useAuth } from '../state/auth';
 import { useToast } from '../state/toast';
 import { CardModal } from '../components/CardModal';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { useSocket } from '../state/socket';
 import {
   Badge,
   CenterState,
@@ -55,6 +57,7 @@ export function BoardPage() {
   const [boardMenuOpen, setBoardMenuOpen] = useState(false);
 
   const readOnly = role === 'viewer';
+  const { socket, joinRoom, leaveRoom } = useSocket();
 
   const boardQuery = useQuery({
     queryKey: ['board', boardId],
@@ -62,6 +65,43 @@ export function BoardPage() {
   });
 
   const view = boardQuery.data;
+
+  // Realtime: join board room and listen for card events
+  useEffect(() => {
+    if (!socket || !boardId) return;
+    const room = `board:${boardId}`;
+    void joinRoom(room).catch(() => undefined);
+
+    const onCardMoved = () => {
+      void queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+    };
+    const onCardUpdated = () => {
+      void queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+    };
+    const onCardCreated = () => {
+      void queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+    };
+    const onCardDeleted = () => {
+      void queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+    };
+
+    socket.on('card:moved', onCardMoved);
+    socket.on('card:updated', onCardUpdated);
+    socket.on('card:created', onCardCreated);
+    socket.on('card:deleted', onCardDeleted);
+    socket.on('list:reordered', onCardMoved);
+    socket.on('list:rebalanced', onCardMoved);
+
+    return () => {
+      socket.off('card:moved', onCardMoved);
+      socket.off('card:updated', onCardUpdated);
+      socket.off('card:created', onCardCreated);
+      socket.off('card:deleted', onCardDeleted);
+      socket.off('list:reordered', onCardMoved);
+      socket.off('list:rebalanced', onCardMoved);
+      void leaveRoom(room).catch(() => undefined);
+    };
+  }, [socket, boardId, joinRoom, leaveRoom, queryClient]);
 
   /** Push a locally-moved card into the cached board view (optimistic). */
   const applyLocalMove = (cardId: string, toListId: string, index: number, movedCard?: Card) => {
@@ -433,12 +473,27 @@ export function BoardPage() {
       </div>
 
       {openCardId ? (
-        <CardModal
-          cardId={openCardId}
-          boardId={boardId}
-          onClose={() => setOpenCardId(null)}
-          readOnly={readOnly}
-        />
+        <ErrorBoundary
+          name="Card Details"
+          onReset={() => setOpenCardId(null)}
+          fallback={
+            <Modal title="Error" onClose={() => setOpenCardId(null)} wide={false}>
+              <ErrorBox message="Could not render card details. An unexpected error occurred." />
+              <div style={{ marginTop: 12, textAlign: 'right' }}>
+                <button type="button" className="btn btn--primary" onClick={() => setOpenCardId(null)}>
+                  Close
+                </button>
+              </div>
+            </Modal>
+          }
+        >
+          <CardModal
+            cardId={openCardId}
+            boardId={boardId}
+            onClose={() => setOpenCardId(null)}
+            readOnly={readOnly}
+          />
+        </ErrorBoundary>
       ) : null}
 
       {renamingListId ? (
