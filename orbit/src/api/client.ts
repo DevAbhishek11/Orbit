@@ -148,15 +148,51 @@ export async function requestWithMeta<T>(
     if (accessToken) headers.authorization = `Bearer ${accessToken}`;
     if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
 
-    const response = await fetch(buildUrl(path, options.query), {
-      method: options.method ?? 'GET',
-      headers,
-      // Same-origin by construction, but be explicit: the refresh cookie is
-      // path-scoped to /api/v1/auth and must be sent on that call.
-      credentials: 'include',
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
-    });
+    let response: Response;
+    try {
+      response = await fetch(buildUrl(path, options.query), {
+        method: options.method ?? 'GET',
+        headers,
+        // Same-origin by construction, but be explicit: the refresh cookie is
+        // path-scoped to /api/v1/auth and must be sent on that call.
+        credentials: 'include',
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: options.signal,
+      });
+    } catch (networkErr: unknown) {
+      if (options.signal?.aborted) {
+        throw networkErr;
+      }
+      const isMutation = options.method && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(options.method);
+      if (isMutation && typeof navigator !== 'undefined' && !navigator.onLine) {
+        // Lazy import to avoid circular deps — queue to Dexie outbox
+        try {
+          const { enqueueOutbox } = await import('../lib/offline-db');
+          await enqueueOutbox({
+            url: buildUrl(path, options.query),
+            method: options.method ?? 'GET',
+            body: options.body === undefined ? '' : JSON.stringify(options.body),
+            headers: headers as Record<string, string>,
+          });
+          throw new ApiError(
+            'OFFLINE_QUEUED',
+            'You are offline — this change has been queued and will sync when back online.',
+            0,
+            { queued: true },
+          );
+        } catch (e) {
+          if (e instanceof ApiError && e.code === 'OFFLINE_QUEUED') throw e;
+          // fallback to normal network error if Dexie fails
+        }
+      }
+      const msg = networkErr instanceof Error ? networkErr.message : 'Network error';
+      throw new ApiError(
+        'NETWORK_ERROR',
+        `Unable to reach server (${msg}). Check your connection or verify backend at /status.`,
+        0,
+        { originalError: msg },
+      );
+    }
 
     if (response.status === 204) {
       return { data: undefined as T, meta: { requestId: response.headers.get('x-request-id') ?? '-' } };

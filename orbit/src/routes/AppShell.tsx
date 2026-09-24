@@ -8,9 +8,16 @@ import { healthApi, usersApi } from '../api/endpoints';
 import { useAuth } from '../state/auth';
 import { useToast } from '../state/toast';
 import { Avatar, Badge, Modal, Spinner } from '../components/ui';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { CommandPalette } from '../components/CommandPalette';
+import { NotificationDrawer } from '../components/NotificationDrawer';
 
 const NAV = [
+  { to: '/docs', label: 'Docs', icon: '📄' },
   { to: '/', label: 'Boards', icon: '▦', end: true },
+  { to: '/chat', label: 'Chat', icon: '💬' },
+  { to: '/files', label: 'Files', icon: '📁' },
+  { to: '/analytics', label: 'Analytics', icon: '📊' },
   { to: '/members', label: 'Members', icon: '◍' },
   { to: '/invitations', label: 'Invitations', icon: '✉' },
   { to: '/workspace', label: 'Workspace', icon: '⚙' },
@@ -24,9 +31,23 @@ export function AppShell() {
   const location = useLocation();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [apiState, setApiState] = useState<'checking' | 'ok' | 'degraded' | 'down'>('checking');
   const navigate = useNavigate();
   const toast = useToast();
+
+  // ⌘K keyboard shortcut
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Live dependency status from the API's own readiness probe.
   useEffect(() => {
@@ -154,10 +175,34 @@ export function AppShell() {
             {apiState === 'checking' ? 'checking…' : apiState === 'ok' ? 'API healthy' : apiState === 'degraded' ? 'API degraded' : 'API unreachable'}
           </Badge>
           <div className="topbar__spacer" />
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            style={{ gap: 6, fontSize: 12.5 }}
+            onClick={() => setPaletteOpen(true)}
+          >
+            <span>🔍 Search</span>
+            <kbd style={{ fontSize: 10, opacity: 0.6, background: 'var(--surface-muted)', padding: '2px 4px', borderRadius: 4 }}>
+              ⌘K
+            </kbd>
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--icon"
+            title="Notifications"
+            onClick={() => setNotifOpen(true)}
+          >
+            🔔
+          </button>
           <ThemeToggle />
         </header>
-        <Outlet />
+        <ErrorBoundary key={location.pathname} name="Page View">
+          <Outlet />
+        </ErrorBoundary>
       </div>
+
+      <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <NotificationDrawer isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
 
       {switcherOpen ? (
         <Modal title="Switch workspace" onClose={() => setSwitcherOpen(false)} wide={false}>

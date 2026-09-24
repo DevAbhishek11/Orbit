@@ -1,4 +1,6 @@
-# Local development infrastructure; run the API/web using npm run dev.
+# Orbit — full local stack (infrastructure + optional app)
+# Run infrastructure only: docker compose up -d mongo redis-cache redis-queue
+# Run full stack (prod-like): docker compose --profile app up -d
 services:
   mongo:
     image: mongo:7
@@ -6,19 +8,119 @@ services:
     ports: ["127.0.0.1:27017:27017"]
     volumes: [mongo-data:/data/db]
     healthcheck:
-      test: [CMD-SHELL, "mongosh --quiet --eval 'try { rs.status().ok } catch(e) { rs.initiate({_id:\"rs0\",members:[{_id:0,host:\"localhost:27017\"}]}) }'"]
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'try { rs.status().ok } catch(e) { rs.initiate({_id:\"rs0\",members:[{_id:0,host:\"localhost:27017\"}]}) }'"]
       interval: 5s
       timeout: 10s
       retries: 20
+
   redis-cache:
     image: redis:7-alpine
     command: [redis-server, --maxmemory, 128mb, --maxmemory-policy, allkeys-lru]
     ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
   redis-queue:
     image: redis:7-alpine
     command: [redis-server, --appendonly, "yes", --maxmemory-policy, noeviction]
     ports: ["127.0.0.1:6380:6379"]
     volumes: [queue-data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes: [minio-data:/data]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+  # Optional: full app via Docker (profile: app)
+  api:
+    build:
+      context: .
+      dockerfile: orbitserver/Dockerfile
+    ports: ["127.0.0.1:8010:8010"]
+    env_file: [orbitserver/.env]
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/orbit?replicaSet=rs0&directConnection=true
+      REDIS_CACHE_URL: redis://redis-cache:6379
+      REDIS_QUEUE_URL: redis://redis-queue:6379
+      S3_ENDPOINT: http://minio:9000
+      SMTP_HOST: mailhog
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      redis-queue:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    profiles: [app]
+
+  worker:
+    build:
+      context: .
+      dockerfile: orbitserver/Dockerfile.worker
+    env_file: [orbitserver/.env]
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/orbit?replicaSet=rs0&directConnection=true
+      REDIS_QUEUE_URL: redis://redis-queue:6379
+      QUEUE_DISABLED: "false"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis-queue:
+        condition: service_healthy
+    profiles: [app]
+
+  web:
+    build:
+      context: .
+      dockerfile: orbit/Dockerfile
+    ports: ["127.0.0.1:5173:80"]
+    depends_on:
+      - api
+    profiles: [app]
+
+  # Observability profile
+  prometheus:
+    image: prom/prometheus:latest
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml
+    profiles: [observability]
+
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    profiles: [observability]
+
 volumes:
   mongo-data:
   queue-data:
+  minio-data:
+  grafana-data:

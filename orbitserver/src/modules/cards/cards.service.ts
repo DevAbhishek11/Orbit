@@ -42,7 +42,14 @@ import {
   type CardFilters,
 } from './cards.repository.js';
 import type { Actor } from '../boards/boards.service.js';
-import type { CommentInput, CreateCardInput, ListCardsQuery, MoveCardInput, UpdateCardInput } from '../boards/boards.schema.js';
+import type {
+  CommentInput,
+  CreateCardInput,
+  CreateCardFromMessageInput,
+  ListCardsQuery,
+  MoveCardInput,
+  UpdateCardInput,
+} from '../boards/boards.schema.js';
 
 const log = childLogger({ module: 'cards' });
 
@@ -521,6 +528,134 @@ export async function rebalanceListOrder(listId: string, workspaceId: string): P
   emitSafe(`board:${list.boardId}`, 'list:rebalanced', { listId, boardId: list.boardId });
   log.info({ listId, count: cards.length }, 'list order keys rebalanced');
   return { count: cards.length };
+}
+
+// ── C1 + T3 — create card from message (cross-pillar transaction) ──────
+
+export async function createCardFromMessage(
+  workspaceId: string,
+  input: CreateCardFromMessageInput,
+  actor: Actor,
+): Promise<Record<string, unknown>> {
+  // Load source message
+  const { findMessageById } = await import('../chat/chat.repository.js');
+  const message = await findMessageById(input.messageId);
+  if (!message || message.workspaceId !== workspaceId) throw notFound('Message');
+
+  const board = await findBoardByIdScoped(input.boardId, workspaceId);
+  if (!board) throw notFound('Board');
+
+  let targetListId = input.listId;
+  if (!targetListId) {
+    // Use first list of board as default
+    const { findListsByBoard } = await import('../boards/boards.repository.js');
+    const lists = await findListsByBoard(input.boardId);
+    if (lists.length === 0) throw notFound('List — board has no lists');
+    targetListId = String(lists[0]!._id);
+  }
+
+  const list = await findListById(targetListId);
+  if (!list || list.workspaceId !== workspaceId || list.boardId !== input.boardId) throw notFound('List');
+
+  const title = input.title?.trim() || message.body.slice(0, 100) || 'Card from message';
+  const order = await computeInsertOrder(targetListId, null);
+
+  const card = await runInTransaction(
+    async (tx) => {
+      const created = await createCard(
+        {
+          workspaceId,
+          boardId: input.boardId,
+          listId: targetListId,
+          title,
+          description: `Created from message in #${message.channelId}:\n\n> ${message.body}`,
+          order,
+          sourceMessageId: input.messageId,
+          createdBy: actor.userId,
+          checklistProgress: { done: 0, total: 0 },
+        },
+        tx.session,
+      );
+
+      await incListCardCount(targetListId, 1, tx.session);
+      await incBoardStats(input.boardId, { cardCount: 1 }, tx.session);
+
+      await createActivity(
+        {
+          workspaceId,
+          entityType: 'card',
+          entityId: String(created._id),
+          actorId: actor.userId,
+          action: 'created_from_message',
+          meta: { messageId: input.messageId, channelId: message.channelId },
+        },
+        tx.session,
+      );
+
+      await recordAudit({
+        actorId: actor.userId,
+        actorRole: actor.role,
+        action: 'card.create_from_message',
+        entityType: 'card',
+        entityId: String(created._id),
+        workspaceId,
+        after: { title, sourceMessageId: input.messageId },
+        session: tx.session,
+      });
+
+      // Post thread reply in source channel with card permalink
+      const { createMessage, updateMessageById } = await import('../chat/chat.repository.js');
+      const reply = await createMessage(
+        {
+          workspaceId,
+          channelId: message.channelId,
+          authorId: actor.userId,
+          body: `📌 Created card [${title}](/boards/${input.boardId}?card=${String(created._id)}) from this message`,
+          parentId: message._id.toString(),
+          threadRootId: message.threadRootId ?? message._id.toString(),
+        },
+        tx.session,
+      );
+
+      // Bump replyCount on root
+      const rootId = message.threadRootId ?? message._id.toString();
+      await updateMessageById(
+        rootId,
+        { $inc: { replyCount: 1 }, lastReplyAt: new Date() } as never,
+        tx.session,
+      );
+
+      void reply;
+
+      return created;
+    },
+    { name: 'card-from-message' },
+  );
+
+  await invalidateTag(`board:${input.boardId}`);
+
+  try {
+    emitSafe(`board:${input.boardId}`, 'card:created', {
+      card: serializeCard(card),
+      boardId: input.boardId,
+      sourceMessageId: input.messageId,
+    });
+    emitSafe(`channel:${message.channelId}`, 'thread:updated', {
+      threadRootId: message.threadRootId ?? message._id.toString(),
+      cardId: String(card._id),
+    });
+    void enqueue('notifications', 'card-from-message', {
+      cardId: String(card._id),
+      workspaceId,
+      channelId: message.channelId,
+      messageId: input.messageId,
+      actorId: actor.userId,
+    });
+  } catch {
+    // ignore
+  }
+
+  return serializeCard(card);
 }
 
 // ── comments (unified collection) ─────────────────────────────────────

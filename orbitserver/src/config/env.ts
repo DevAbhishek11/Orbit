@@ -40,6 +40,7 @@ const schema = z.object({
   GIT_SHA: z.string().optional().default(''),
   APP_VERSION: z.string().optional().default('0.1.0'),
   TRUST_PROXY: booleanish.default('true'),
+  WEB_CONCURRENCY: z.coerce.number().int().min(1).optional(),
 
   // ── Auth ────────────────────────────────────────────────────────────
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
@@ -79,9 +80,18 @@ const schema = z.object({
   // ── Queues ──────────────────────────────────────────────────────────
   QUEUE_DISABLED: booleanish.default('true'),
 
-  // ── Mail (stub until the mail queue lands in Phase 10) ─────────────
+  // ── S3 / MinIO (files pillar) ───────────────────────────────────────
+  S3_ENDPOINT: z.string().optional().default(''),
+  S3_BUCKET: z.string().default('orbit-files'),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_ACCESS_KEY_ID: z.string().optional().default(''),
+  S3_SECRET_ACCESS_KEY: z.string().optional().default(''),
+  S3_FORCE_PATH_STYLE: booleanish.default('true'),
+
+  // ── Mail ────────────────────────────────────────────────────────────
   MAIL_FROM: z.string().default('Orbit <no-reply@orbit.dev>'),
   SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional().default(1025),
 
   // ── Health / metrics ────────────────────────────────────────────────
   METRICS_ENABLED: booleanish.default('true'),

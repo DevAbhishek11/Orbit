@@ -198,3 +198,175 @@ export interface Session {
   lastUsedAt: string;
   current: boolean;
 }
+
+// ── Pages / Docs ─────────────────────────────────────────────────────────────
+
+export interface PageBlock {
+  id: string;
+  type:
+    | 'paragraph'
+    | 'h1'
+    | 'h2'
+    | 'h3'
+    | 'bullet'
+    | 'numbered'
+    | 'todo'
+    | 'quote'
+    | 'code'
+    | 'divider'
+    | 'callout';
+  content: string;
+  order: string;
+  checked?: boolean;
+  language?: string;
+}
+
+export interface Page {
+  id: string;
+  _id?: string;
+  workspaceId: string;
+  title: string;
+  icon?: string | null;
+  cover?: string | null;
+  parentId: string | null;
+  ancestors: string[];
+  depth: number;
+  order: string;
+  blocks: PageBlock[];
+  plainText: string;
+  visibility: 'workspace' | 'private' | 'link';
+  allowedUserIds: string[];
+  favouriteOf: string[];
+  version: number;
+  lastSnapshotAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PageVersion {
+  id: string;
+  _id: string;
+  pageId: string;
+  version: number;
+  title: string;
+  blocks: PageBlock[];
+  snapshotReason: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+
+export interface Reaction {
+  emoji: string;
+  userIds: string[];
+}
+
+export interface Channel {
+  id: string;
+  _id?: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  type: 'public' | 'private' | 'dm';
+  topic?: string;
+  memberIds: string[];
+  lastMessage?: {
+    _id: string;
+    authorId: string;
+    preview: string;
+    at: string;
+  } | null;
+  messageCount: number;
+  unread?: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Message {
+  id: string;
+  _id?: string;
+  workspaceId: string;
+  channelId: string;
+  authorId: string;
+  body: string;
+  mentions: string[];
+  fileIds: string[];
+  parentId?: string | null;
+  threadRootId?: string | null;
+  replyCount: number;
+  lastReplyAt?: string | null;
+  reactions: Reaction[];
+  editedAt?: string | null;
+  deletedAt?: string | null;
+  clientId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+export interface NotificationItem {
+  id: string;
+  _id: string;
+  workspaceId: string;
+  userId: string;
+  actorId?: string | null;
+  type: string;
+  title: string;
+  body: string;
+  link?: string | null;
+  entityType?: 'card' | 'page' | 'channel' | 'workspace' | null;
+  entityId?: string | null;
+  groupKey?: string | null;
+  groupCount: number;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+
+export interface SearchResults {
+  cards: Card[];
+  pages: Page[];
+  channels: Channel[];
+  messages: Message[];
+}
+
+export interface SearchResponse {
+  query: string;
+  totalResults: number;
+  results: SearchResults;
+}
+
+// ── Analytics ────────────────────────────────────────────────────────────────
+
+export interface WorkspaceKpis {
+  totalCards: number;
+  completedCards: number;
+  activeCards: number;
+  overdueCards: number;
+  completionRate: number;
+  pageCount: number;
+  channelCount: number;
+  messageCount: number;
+  boardCount: number;
+  memberCount: number;
+}
+
+export interface BoardBurndown {
+  boardId: string;
+  total: number;
+  completed: number;
+  remaining: number;
+  cards: Array<{
+    id: string;
+    title: string;
+    listId: string;
+    completed: boolean;
+    dueAt: string | null;
+    priority: Priority;
+  }>;
+}

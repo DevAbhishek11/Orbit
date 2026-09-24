@@ -18,6 +18,13 @@ import { BoardModel } from '../src/modules/boards/boards.model.js';
 import { ListModel } from '../src/modules/boards/lists.model.js';
 import { CardModel } from '../src/modules/cards/cards.model.js';
 import { CommentModel } from '../src/modules/comments/comments.model.js';
+import { PageModel } from '../src/modules/pages/pages.model.js';
+import { PageVersionModel } from '../src/modules/pages/pageversions.model.js';
+import { ChannelModel } from '../src/modules/chat/channels.model.js';
+import { MessageModel } from '../src/modules/chat/messages.model.js';
+import { ChannelReadModel } from '../src/modules/chat/channelReads.model.js';
+import { NotificationModel } from '../src/modules/notifications/notifications.model.js';
+import { FileModel } from '../src/modules/files/files.model.js';
 import { UserModel } from '../src/modules/users/users.model.js';
 import { InvitationModel } from '../src/modules/workspaces/invitations.model.js';
 import { WorkspaceMemberModel } from '../src/modules/workspaces/workspaceMembers.model.js';
@@ -31,6 +38,13 @@ const MODELS = [
   BoardModel,
   ListModel,
   CardModel,
+  PageModel,
+  PageVersionModel,
+  ChannelModel,
+  MessageModel,
+  ChannelReadModel,
+  NotificationModel,
+  FileModel,
   CommentModel,
   ActivityModel,
   AuditLogModel,
