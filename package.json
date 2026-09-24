@@ -37,8 +37,15 @@
     "lint-staged": "^17.5.1"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
+    "orbitserver/**/*.{ts,tsx,js,jsx}": [
+      "eslint --fix --config orbitserver/eslint.config.js",
+      "prettier --write"
+    ],
+    "orbit/**/*.{ts,tsx,js,jsx}": [
+      "eslint --fix --config orbit/eslint.config.js",
+      "prettier --write"
+    ],
+    "shared/**/*.{ts,tsx,js,jsx}": [
       "prettier --write"
     ],
     "*.{json,md,yml,yaml}": [
