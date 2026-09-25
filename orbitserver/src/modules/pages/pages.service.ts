@@ -1,8 +1,3 @@
-/**
- * Pages service (BUILD_PROMPT Phase 7 — Notion pillar):
- * Subtree tree hierarchy, optimistic concurrency on autosave (409 VERSION_CONFLICT),
- * version snapshots, backlinks and favourites.
- */
 import { firstKey, keyBetween } from '@orbit/shared';
 import { conflict, notFound, validationFailed } from '../../infrastructure/errors/ApiError.js';
 import { runInTransaction } from '../../infrastructure/db/transaction.js';
@@ -70,7 +65,6 @@ export async function createPage(
     lastSnapshotAt: new Date(),
   });
 
-  // Create initial version snapshot
   await repo.createVersionSnapshot({
     pageId: page._id.toString(),
     workspaceId,
@@ -92,9 +86,7 @@ export async function createPage(
       entityId: page._id.toString(),
       workspaceId,
     });
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   return page;
 }
@@ -118,7 +110,6 @@ export async function updatePage(
   const current = await repo.findPageByIdScoped(pageId, workspaceId);
   if (!current) throw notFound('Page');
 
-  // Optimistic concurrency check (Rule 4 autosave)
   if (current.version !== input.version) {
     throw conflict('Page was modified by another session', {
       currentVersion: current.version,
@@ -132,7 +123,6 @@ export async function updatePage(
   const newVersion = current.version + 1;
   const now = new Date();
 
-  // Snapshot if more than 5 minutes since last snapshot
   const shouldSnapshot =
     !current.lastSnapshotAt ||
     now.getTime() - new Date(current.lastSnapshotAt).getTime() > 5 * 60_000;
@@ -177,9 +167,7 @@ export async function updatePage(
       entityId: pageId,
       workspaceId,
     });
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   return updated;
 }
@@ -253,7 +241,6 @@ export async function restorePageVersion(
 
   if (!updated) throw notFound('Page');
 
-  // Record restoration snapshot
   await repo.createVersionSnapshot({
     pageId,
     workspaceId,

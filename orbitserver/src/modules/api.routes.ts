@@ -1,7 +1,3 @@
-/**
- * /api/v1 router — mounts every module (vertical slices).
- * Global rate limit applies to the whole business API.
- */
 import mongoose from 'mongoose';
 import { dependencyUnavailable } from '../infrastructure/errors/ApiError.js';
 import { Router } from 'express';

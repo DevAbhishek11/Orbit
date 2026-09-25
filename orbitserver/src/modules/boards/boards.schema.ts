@@ -1,6 +1,3 @@
-/**
- * Boards / lists / cards endpoint contracts (Zod — single source of truth).
- */
 import { z } from 'zod';
 import { CONTENT } from '@orbit/shared';
 
@@ -17,8 +14,6 @@ export const cursorQuerySchema = z.object({
   cursor: z.string().max(200).optional(),
 });
 
-// ── Boards ────────────────────────────────────────────────────────────
-
 export const createBoardSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().max(2_000).optional(),
@@ -34,15 +29,13 @@ export const updateBoardSchema = z
     visibility: z.enum(['workspace', 'private']).optional(),
     memberIds: z.array(objectId).max(200).optional(),
     background: z.string().max(40).nullable().optional(),
-    archivedAt: z.boolean().optional(), // true → archive, false → unarchive
+    archivedAt: z.boolean().optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, 'At least one field must be provided');
 
 export const boardParamsSchema = z.object({ id: objectId });
 export const widParamsSchema = z.object({ wid: objectId });
-
-// ── Lists ─────────────────────────────────────────────────────────────
 
 export const createListSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -62,7 +55,7 @@ export const updateListSchema = z
 
 export const reorderListsSchema = z.object({
   boardId: objectId,
-  /** Full ordered list of list ids — validated against the board's set. */
+
   listIds: z.array(objectId).min(1).max(50),
 });
 
@@ -74,8 +67,6 @@ export const deleteListQuerySchema = z.object({
     .optional()
     .default(false),
 });
-
-// ── Cards ─────────────────────────────────────────────────────────────
 
 export const labelSchema = z
   .object({
@@ -111,7 +102,7 @@ export const createCardSchema = z.object({
   startAt: z.coerce.date().nullable().optional(),
   priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']).optional(),
   coverColor: z.string().max(20).nullable().optional(),
-  /** Insert position: the card the new one goes ABOVE (null/omitted → end). */
+
   beforeCardId: objectId.nullable().optional(),
   sourceMessageId: objectId.optional(),
   pageId: objectId.optional(),
@@ -130,7 +121,7 @@ export const updateCardSchema = z
     startAt: z.coerce.date().nullable().optional(),
     priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']).optional(),
     coverColor: z.string().max(20).nullable().optional(),
-    completed: z.boolean().optional(), // toggles completedAt
+    completed: z.boolean().optional(),
     archivedAt: z.boolean().optional(),
   })
   .strict()
@@ -140,7 +131,7 @@ export const moveCardSchema = z
   .object({
     version: z.number().int().min(1),
     targetListId: objectId,
-    /** Neighbours in the target list: new card goes between them. */
+
     beforeCardId: objectId.nullable().optional(),
     afterCardId: objectId.nullable().optional(),
     clientMutationId: z.string().max(64).optional(),

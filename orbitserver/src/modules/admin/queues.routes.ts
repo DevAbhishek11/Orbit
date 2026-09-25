@@ -1,8 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
-/**
- * Admin queues dashboard — BullBoard (BUILD_PROMPT Phase 10).
- * Mounted at /admin/queues, protected by admin role.
- */
 import { Router } from 'express';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';

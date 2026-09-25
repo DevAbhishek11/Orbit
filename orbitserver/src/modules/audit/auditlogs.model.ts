@@ -1,8 +1,3 @@
-/**
- * Append-only audit log (BUILD_PROMPT Phase 4).
- * One document per mutating action; answers "who changed what, when".
- * TTL index: 365-day retention. NEVER updated, NEVER soft-deleted.
- */
 import { Schema, model } from 'mongoose';
 import { RETENTION } from '@orbit/shared';
 
@@ -10,8 +5,8 @@ export interface IAuditLog {
   workspaceId?: string;
   actorId: string;
   actorRole?: string;
-  action: string; // e.g. 'auth.login', 'card.move', 'workspace.member.remove'
-  entityType: string; // 'user' | 'workspace' | 'card' | ...
+  action: string;
+  entityType: string;
   entityId?: string;
   before?: Record<string, unknown>;
   after?: Record<string, unknown>;
@@ -29,7 +24,7 @@ const auditLogSchema = new Schema<IAuditLog>(
     action: { type: String, required: true },
     entityType: { type: String, required: true },
     entityId: { type: String },
-    // Bounded snapshots — cap stored size so audit can never balloon a doc.
+
     before: { type: Schema.Types.Mixed },
     after: { type: Schema.Types.Mixed },
     ip: { type: String },

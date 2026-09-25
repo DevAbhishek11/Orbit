@@ -1,7 +1,3 @@
-/**
- * Cards repository — the only place with card queries (rule 1).
- * Every fetch is workspace-scoped; ordering uses the {listId, order} index.
- */
 import type { ClientSession, FilterQuery, Types } from 'mongoose';
 import { buildSeekFilter, clampLimit, decodeCursor, encodeCursor } from '@orbit/shared';
 import { CardModel, type ICard } from './cards.model.js';
@@ -19,15 +15,9 @@ export async function createCard(
 
 export async function findCardById(id: string, session?: ClientSession): Promise<CardDoc | null> {
   const q = CardModel.findOne({ _id: id });
-  return ((session ? q.session(session) : q).lean<CardDoc>().exec()) ?? null;
+  return (session ? q.session(session) : q).lean<CardDoc>().exec() ?? null;
 }
 
-/**
- * Trash lookup: finds a card even when it is soft-deleted.
- * Used by the restore route, whose authorize() loader must be able to SEE the
- * deleted document (the default query scope hides it, which made
- * POST /cards/:id/restore unreachable — a deleted card always answered 404).
- */
 export async function findCardByIdIncludingDeleted(
   id: string,
   session?: ClientSession,
@@ -37,17 +27,19 @@ export async function findCardByIdIncludingDeleted(
   return (await scoped.lean<CardDoc>().exec()) ?? null;
 }
 
-/** Tenant guard baked into the query — cross-tenant reads answer null → 404. */
 export async function findCardByIdScoped(
   id: string,
   workspaceId: string,
   session?: ClientSession,
 ): Promise<CardDoc | null> {
   const q = CardModel.findOne({ _id: id, workspaceId });
-  return ((session ? q.session(session) : q).lean<CardDoc>().exec()) ?? null;
+  return (session ? q.session(session) : q).lean<CardDoc>().exec() ?? null;
 }
 
-export async function getLastCardOrder(listId: string, session?: ClientSession): Promise<string | null> {
+export async function getLastCardOrder(
+  listId: string,
+  session?: ClientSession,
+): Promise<string | null> {
   const q = CardModel.findOne({ listId, archivedAt: null }).sort({ order: -1 }).select('order');
   const card = await (session ? q.session(session) : q).lean<{ order: string }>().exec();
   return card?.order ?? null;
@@ -62,7 +54,7 @@ export async function findNeighborCards(
   const load = async (id: string | undefined): Promise<CardDoc | null> => {
     if (!id) return null;
     const q = CardModel.findOne({ _id: id, listId, archivedAt: null });
-    return ((session ? q.session(session) : q).lean<CardDoc>().exec()) ?? null;
+    return (session ? q.session(session) : q).lean<CardDoc>().exec() ?? null;
   };
   const [before, after] = await Promise.all([load(beforeId), load(afterId)]);
   return { before, after };
@@ -118,10 +110,6 @@ export interface ListCardsResult {
   nextCursor: string | null;
 }
 
-/**
- * Cursor-paginated card listing (never skip). Sort: list order for board
- * render, updatedAt for feeds. Uses {listId, order} / {boardId, ...} indexes.
- */
 export async function listCards(
   workspaceId: string,
   filters: CardFilters,
@@ -174,7 +162,7 @@ export async function updateCardWithVersionGuard(
     { $set: { ...update, version: expectedVersion + 1 } },
     { new: true },
   );
-  return ((session ? q.session(session) : q).lean<CardDoc>().exec()) ?? null;
+  return (session ? q.session(session) : q).lean<CardDoc>().exec() ?? null;
 }
 
 export async function updateCard(
@@ -183,14 +171,22 @@ export async function updateCard(
   session?: ClientSession,
 ): Promise<CardDoc | null> {
   const q = CardModel.findOneAndUpdate({ _id: cardId }, { $set: update }, { new: true });
-  return ((session ? q.session(session) : q).lean<CardDoc>().exec()) ?? null;
+  return (session ? q.session(session) : q).lean<CardDoc>().exec() ?? null;
 }
 
-export async function incCardCommentCount(cardId: string, delta: number, session?: ClientSession): Promise<void> {
+export async function incCardCommentCount(
+  cardId: string,
+  delta: number,
+  session?: ClientSession,
+): Promise<void> {
   await CardModel.updateOne({ _id: cardId }, { $inc: { commentCount: delta } }, { session }).exec();
 }
 
-export async function softDeleteCard(cardId: string, actorId: string, session?: ClientSession): Promise<boolean> {
+export async function softDeleteCard(
+  cardId: string,
+  actorId: string,
+  session?: ClientSession,
+): Promise<boolean> {
   const result = await CardModel.findOneAndUpdate(
     { _id: cardId },
     { $set: { deletedAt: new Date(), deletedBy: actorId } },
@@ -200,13 +196,14 @@ export async function softDeleteCard(cardId: string, actorId: string, session?: 
 }
 
 export async function restoreCard(cardId: string): Promise<CardDoc | null> {
-  return (
-    (await CardModel.restore({ _id: cardId }).lean<CardDoc>().exec()) ?? null
-  );
+  return (await CardModel.restore({ _id: cardId }).lean<CardDoc>().exec()) ?? null;
 }
 
-/** Prune a removed member from every card assignment in the workspace (T4). */
-export async function pruneAssignee(workspaceId: string, userId: string, session?: ClientSession): Promise<number> {
+export async function pruneAssignee(
+  workspaceId: string,
+  userId: string,
+  session?: ClientSession,
+): Promise<number> {
   const result = await CardModel.updateMany(
     { workspaceId, assignees: userId },
     { $pull: { assignees: userId } },

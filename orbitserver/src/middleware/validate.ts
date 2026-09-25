@@ -1,8 +1,3 @@
-/**
- * Zod validation middleware (BUILD_PROMPT Phase 4, rule 14):
- * strict objects, unknown keys stripped, 422 with per-field issues,
- * sanitized against NoSQL operator injection for params/query/bodies.
- */
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { ZodTypeAny, z } from 'zod';
 import { validationFailed } from '../infrastructure/errors/ApiError.js';
@@ -13,9 +8,8 @@ export interface ValidateSchemas {
   body?: ZodTypeAny;
 }
 
-/** Recursively reject keys starting with '$' or containing '.' (NoSQL injection). */
 function containsOperatorKeys(value: unknown, depth = 0): boolean {
-  if (depth > 6) return true; // absurd nesting is itself suspicious
+  if (depth > 6) return true;
   if (Array.isArray(value)) return value.some((v) => containsOperatorKeys(v, depth + 1));
   if (typeof value === 'object' && value !== null) {
     for (const key of Object.keys(value)) {
@@ -30,19 +24,23 @@ export function validate(schemas: ValidateSchemas): RequestHandler {
   return (req: Request, _res: Response, next: NextFunction): void => {
     const issues: Array<{ path: string; message: string; code?: string }> = [];
 
-    const runPart = (
-      part: 'params' | 'query' | 'body',
-      source: unknown,
-    ): unknown => {
+    const runPart = (part: 'params' | 'query' | 'body', source: unknown): unknown => {
       const schema = schemas[part];
       if (!schema) return source;
       if (containsOperatorKeys(source)) {
-        issues.push({ path: part, message: 'Illegal operator key in input', code: 'nosql_injection' });
+        issues.push({
+          path: part,
+          message: 'Illegal operator key in input',
+          code: 'nosql_injection',
+        });
         return undefined;
       }
       const result = schema.safeParse(source) as
         | { success: true; data: unknown }
-        | { success: false; error: { issues: Array<{ path: (string | number)[]; message: string; code: string }> } };
+        | {
+            success: false;
+            error: { issues: Array<{ path: (string | number)[]; message: string; code: string }> };
+          };
       if (!result.success) {
         for (const issue of result.error.issues) {
           issues.push({
@@ -67,7 +65,6 @@ export function validate(schemas: ValidateSchemas): RequestHandler {
 
     if (schemas.params) req.params = params as Request['params'];
     if (schemas.query) {
-      // Express 5 query is a getter on the prototype — define an own property.
       Object.defineProperty(req, 'query', {
         value: query as z.output<ZodTypeAny>,
         writable: true,

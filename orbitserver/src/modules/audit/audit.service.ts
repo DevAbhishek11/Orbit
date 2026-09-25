@@ -1,9 +1,3 @@
-/**
- * Audit service (BUILD_PROMPT Phase 4, rule 18):
- * every mutation writes an audit entry. Audit writes NEVER block the response
- * — fire-and-forget with error capture, unless the caller passes a session
- * (then the audit entry is part of the same atomic transaction).
- */
 import type { ClientSession } from 'mongoose';
 import { AuditLogModel, type IAuditLog } from './auditlogs.model.js';
 import { childLogger } from '../../infrastructure/logger/index.js';
@@ -23,12 +17,13 @@ export interface AuditInput {
   ip?: string;
   userAgent?: string;
   requestId?: string;
-  /** When provided, the audit write joins the caller's transaction. */
+
   session?: ClientSession;
 }
 
-/** Cap snapshot sizes so a huge document can never bloat the audit trail. */
-function boundSnapshot(value: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+function boundSnapshot(
+  value: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
   if (!value) return undefined;
   const json = JSON.stringify(value);
   if (json.length <= 16_000) return value;
@@ -53,7 +48,6 @@ export async function recordAudit(input: AuditInput): Promise<void> {
   };
 
   if (input.session) {
-    // Atomic path — the caller owns failure handling inside the transaction.
     await AuditLogModel.create([doc], { session: input.session });
     return;
   }
@@ -61,12 +55,10 @@ export async function recordAudit(input: AuditInput): Promise<void> {
   try {
     await AuditLogModel.create([doc]);
   } catch (err) {
-    // Audit failure must never fail the user's request — but it is loud.
     log.error({ err, action: doc.action, entityId: doc.entityId }, 'audit write failed');
   }
 }
 
-/** Fire-and-forget wrapper for controller/service call sites. */
 export function recordAuditAsync(input: AuditInput): void {
   void recordAudit(input);
 }

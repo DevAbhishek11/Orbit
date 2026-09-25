@@ -1,6 +1,3 @@
-/**
- * Users repository — the ONLY place with user queries (layering rule 1).
- */
 import type { ClientSession, FilterQuery } from 'mongoose';
 import { UserModel, type IUser, type UserDoc } from './users.model.js';
 
@@ -43,7 +40,11 @@ export async function findUsersByHandles(handles: string[]): Promise<UserDoc[]> 
 
 export async function findUsersByIds(ids: string[]): Promise<UserDoc[]> {
   if (ids.length === 0) return [];
-  return (await UserModel.find({ _id: { $in: ids } }).lean<UserDoc[]>().exec()) ?? [];
+  return (
+    (await UserModel.find({ _id: { $in: ids } })
+      .lean<UserDoc[]>()
+      .exec()) ?? []
+  );
 }
 
 export async function findUsers(filter: FilterQuery<IUser>, limit: number): Promise<UserDoc[]> {
@@ -69,27 +70,24 @@ export async function createUser(
   data: Pick<IUser, 'email' | 'passwordHash' | 'name' | 'handle'> & Partial<IUser>,
   session?: ClientSession,
 ): Promise<UserDoc> {
-  const [user] = await UserModel.create([{ ...data, email: data.email.toLowerCase() }], { session });
+  const [user] = await UserModel.create([{ ...data, email: data.email.toLowerCase() }], {
+    session,
+  });
   return user!.toObject();
 }
 
 export async function updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
   await UserModel.updateOne(
     { _id: userId },
-    { $set: { passwordHash }, $inc: { tokenVersion: 1 } }, // invalidate all access tokens
+    { $set: { passwordHash }, $inc: { tokenVersion: 1 } },
   ).exec();
 }
 
-/** Self-service profile patch — dotted paths so `preferences.x` merges in place. */
 export async function updateUserProfile(
   userId: string,
   update: Record<string, unknown>,
 ): Promise<UserDoc | null> {
-  const doc = await UserModel.findOneAndUpdate(
-    { _id: userId },
-    { $set: update },
-    { new: true },
-  )
+  const doc = await UserModel.findOneAndUpdate({ _id: userId }, { $set: update }, { new: true })
     .lean<UserDoc>()
     .exec();
   return doc ?? null;
@@ -99,24 +97,25 @@ export async function bumpTokenVersion(userId: string, session?: ClientSession):
   await UserModel.updateOne({ _id: userId }, { $inc: { tokenVersion: 1 } }, { session }).exec();
 }
 
-export async function recordFailedLogin(userId: string, lockAfter: number, lockMs: number): Promise<void> {
-  await UserModel.updateOne(
-    { _id: userId },
-    [
-      {
-        $set: {
-          failedLoginCount: { $add: ['$failedLoginCount', 1] },
-          lockedUntil: {
-            $cond: [
-              { $gte: [{ $add: ['$failedLoginCount', 1] }, lockAfter] },
-              new Date(Date.now() + lockMs),
-              '$lockedUntil',
-            ],
-          },
+export async function recordFailedLogin(
+  userId: string,
+  lockAfter: number,
+  lockMs: number,
+): Promise<void> {
+  await UserModel.updateOne({ _id: userId }, [
+    {
+      $set: {
+        failedLoginCount: { $add: ['$failedLoginCount', 1] },
+        lockedUntil: {
+          $cond: [
+            { $gte: [{ $add: ['$failedLoginCount', 1] }, lockAfter] },
+            new Date(Date.now() + lockMs),
+            '$lockedUntil',
+          ],
         },
       },
-    ],
-  ).exec();
+    },
+  ]).exec();
 }
 
 export async function recordSuccessfulLogin(userId: string): Promise<void> {
@@ -162,7 +161,6 @@ export async function markEmailVerified(userId: string): Promise<void> {
   ).exec();
 }
 
-/** Hydration check used by authenticate middleware + session cache. */
 export async function getAuthSnapshot(
   userId: string,
 ): Promise<{ tokenVersion: number; status: string } | null> {

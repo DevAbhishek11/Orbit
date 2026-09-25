@@ -1,6 +1,3 @@
-/**
- * Unified Search routes (BUILD_PROMPT Phase 11 — Faceted Search).
- */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { ok } from '../../infrastructure/http/response.js';
@@ -124,7 +121,12 @@ searchRouter.get(
     ok(res, {
       suggestions: {
         boards: boards.map((b) => ({ id: b._id.toString(), title: b.name, type: 'board' })),
-        pages: pages.map((p) => ({ id: p._id.toString(), title: p.title, icon: p.icon, type: 'page' })),
+        pages: pages.map((p) => ({
+          id: p._id.toString(),
+          title: p.title,
+          icon: p.icon,
+          type: 'page',
+        })),
         channels: channels.map((c) => ({ id: c._id.toString(), title: c.name, type: 'channel' })),
       },
     });

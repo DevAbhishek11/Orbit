@@ -1,6 +1,3 @@
-/**
- * Chat controller — HTTP plumbing only.
- */
 import type { Request, Response } from 'express';
 import { created, noContent, ok } from '../../infrastructure/http/response.js';
 import { requireAuth } from '../../middleware/authenticate.js';

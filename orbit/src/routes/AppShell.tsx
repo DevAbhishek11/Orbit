@@ -1,285 +1,449 @@
-/**
- * Authenticated layout: sidebar (workspace switcher + navigation), top bar
- * (workspace name, API status, user menu) and the routed page outlet.
- */
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { healthApi, usersApi } from '../api/endpoints';
-import { useAuth } from '../state/auth';
-import { useToast } from '../state/toast';
-import { Avatar, Badge, Modal, Spinner } from '../components/ui';
-import { ErrorBoundary } from '../components/ErrorBoundary';
-import { CommandPalette } from '../components/CommandPalette';
-import { NotificationDrawer } from '../components/NotificationDrawer';
+import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import {
+  FileText,
+  LayoutDashboard,
+  MessageSquare,
+  Folder,
+  BarChart3,
+  Users,
+  UserCog,
+  Search,
+  Bell,
+  Sun,
+  Moon,
+  Monitor,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Menu,
+  LogOut,
+  Download,
+  Kanban,
+} from "lucide-react";
+import { healthApi } from "../api/endpoints";
+import { CommandPalette } from "../components/CommandPalette";
+import { NotificationDrawer } from "../components/NotificationDrawer";
+import { useAuth } from "../state/auth";
+import { useToast } from "../state/toast";
 
-const NAV = [
-  { to: '/docs', label: 'Docs', icon: '📄' },
-  { to: '/', label: 'Boards', icon: '▦', end: true },
-  { to: '/chat', label: 'Chat', icon: '💬' },
-  { to: '/files', label: 'Files', icon: '📁' },
-  { to: '/analytics', label: 'Analytics', icon: '📊' },
-  { to: '/members', label: 'Members', icon: '◍' },
-  { to: '/invitations', label: 'Invitations', icon: '✉' },
-  { to: '/workspace', label: 'Workspace', icon: '⚙' },
-  { to: '/status', label: 'Service status', icon: '◉' },
-  { to: '/settings', label: 'My settings', icon: '☺' },
-];
+interface NavSection {
+  title: string;
+  items: {
+    to: string;
+    label: string;
+    icon: ReactNode;
+    badge?: string | number;
+    roles?: string[];
+  }[];
+}
 
 export function AppShell() {
-  const { user, workspace, workspaces, role, signOut, selectWorkspace, bootError } = useAuth();
+  const { user, workspace, workspaces, selectWorkspace, signOut, role } =
+    useAuth();
+  const [theme, setThemeState] = useState<"light" | "dark" | "system">(() => {
+    return (
+      (localStorage.getItem("orbit_theme") as "light" | "dark" | "system") ||
+      "dark"
+    );
+  });
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem("orbit_sidebar_collapsed") === "true";
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
-  const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [apiState, setApiState] = useState<'checking' | 'ok' | 'degraded' | 'down'>('checking');
+  const [apiState, setApiState] = useState<
+    "checking" | "ok" | "degraded" | "down"
+  >("checking");
   const navigate = useNavigate();
   const toast = useToast();
 
-  // ⌘K keyboard shortcut
+  const setTheme = (t: "light" | "dark" | "system") => {
+    setThemeState(t);
+    localStorage.setItem("orbit_theme", t);
+    const resolved =
+      t === "system"
+        ? window.matchMedia("(prefers-color-scheme: light)").matches
+          ? "light"
+          : "dark"
+        : t;
+    document.documentElement.dataset.theme = resolved;
+  };
+
+  const toggleSidebar = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("orbit_sidebar_collapsed", String(next));
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setPaletteOpen((prev) => !prev);
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleSidebar]);
 
-  // Live dependency status from the API's own readiness probe.
   useEffect(() => {
     let cancelled = false;
     const poll = async () => {
       try {
         const status = await healthApi.ready();
-        if (!cancelled) setApiState(status.status === 'ok' ? 'ok' : status.status === 'unavailable' ? 'down' : 'degraded');
+        if (!cancelled)
+          setApiState(
+            status.status === "ok"
+              ? "ok"
+              : status.status === "unavailable"
+                ? "down"
+                : "degraded",
+          );
       } catch {
-        if (!cancelled) setApiState('down');
+        if (!cancelled) setApiState("down");
       }
     };
     void poll();
-    const timer = window.setInterval(poll, 30_000);
+    const interval = setInterval(poll, 30_000);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      clearInterval(interval);
     };
   }, []);
 
-  const onSignOut = async (allDevices: boolean) => {
-    setUserMenuOpen(false);
-    await signOut(allDevices);
-    navigate('/login', { replace: true });
-  };
-
-  const onSwitch = async (workspaceId: string) => {
-    setSwitcherOpen(false);
+  const handleExportData = () => {
     try {
-      await selectWorkspace(workspaceId);
-      toast.success('Workspace switched');
-      navigate('/');
+      const blob = new Blob([JSON.stringify(user, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orbit-export-${user?.id ?? "user"}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Personal data exported successfully");
     } catch {
-      toast.error('Could not switch workspace');
+      toast.error("Failed to export data");
     }
   };
 
-  if (bootError) {
-    return (
-      <div className="auth-page">
-        <div className="auth-card">
-          <h2 className="auth-card__title">Cannot reach the Orbit API</h2>
-          <p className="auth-card__subtitle">{bootError}</p>
-          <p className="faint" style={{ fontSize: 13 }}>
-            Start the API with <code>npm run dev:server</code> (see <code>Docs/RUNNING.md</code>), then reload.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const navSections: NavSection[] = [
+    {
+      title: "PLATFORM",
+      items: [
+        { to: "/", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
+        { to: "/docs", label: "Docs", icon: <FileText size={18} /> },
+        { to: "/chat", label: "Chat", icon: <MessageSquare size={18} /> },
+        { to: "/files", label: "Files", icon: <Folder size={18} /> },
+      ],
+    },
+    {
+      title: "INSIGHTS & TEAM",
+      items: [
+        { to: "/analytics", label: "Analytics", icon: <BarChart3 size={18} /> },
+        { to: "/members", label: "Members", icon: <Users size={18} /> },
+      ],
+    },
+    {
+      title: "PREFERENCES",
+      items: [
+        { to: "/settings", label: "Settings", icon: <UserCog size={18} /> },
+      ],
+    },
+  ];
+
+  const filteredSections = navSections
+    .map((sec) => ({
+      ...sec,
+      items: sec.items.filter(
+        (item) => !item.roles || (role && item.roles.includes(role)),
+      ),
+    }))
+    .filter((sec) => sec.items.length > 0);
+
+  const initial = user?.name ? user.name.charAt(0).toUpperCase() : "U";
 
   return (
-    <div className={`app-shell ${mobileOpen ? 'mobile-nav-open' : ''}`}>
-      {mobileOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
-      <aside className="sidebar">
-        <div className="sidebar__brand">
-          <span className="sidebar__logo">O</span>
-          <div className="grow">
-            <div style={{ fontWeight: 600 }}>Orbit</div>
-            <div className="faint" style={{ fontSize: 11.5 }}>
-              docs · boards · chat
+    <div className={`portal-layout ${collapsed ? "sidebar--collapsed" : ""}`}>
+      <div
+        className={`portal-sidebar__backdrop ${mobileOpen ? "is-visible" : ""}`}
+        onClick={() => setMobileOpen(false)}
+      />
+
+      <aside className={`portal-sidebar ${mobileOpen ? "is-mobile-open" : ""}`}>
+        <div className="portal-sidebar__brand">
+          <div className="portal-sidebar__brand-meta">
+            <div className="portal-sidebar__logo-mark">
+              <Kanban size={20} color="#fff" />
             </div>
+            {!collapsed && (
+              <div className="portal-sidebar__brand-text">
+                <span className="portal-sidebar__brand-title">ORBIT</span>
+                <span className="portal-sidebar__brand-tag">ENTERPRISE</span>
+              </div>
+            )}
           </div>
+          <button
+            className="portal-sidebar__collapse-btn"
+            onClick={toggleSidebar}
+            title={
+              collapsed
+                ? "Expand sidebar (Ctrl+B)"
+                : "Collapse sidebar (Ctrl+B)"
+            }
+          >
+            {collapsed ? (
+              <PanelLeftOpen size={16} />
+            ) : (
+              <PanelLeftClose size={16} />
+            )}
+          </button>
         </div>
 
-        <div className="sidebar__scroll">
-          <button type="button" className="workspace-switcher" onClick={() => setSwitcherOpen(true)}>
-            <span className="workspace-switcher__avatar">{workspace?.name?.[0]?.toUpperCase() ?? 'O'}</span>
-            <span className="grow" style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {workspace?.name ?? 'No workspace'}
+        {!collapsed && (
+          <div className="portal-user-badge">
+            <div className="portal-user-badge__avatar">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} />
+              ) : (
+                <span>{initial}</span>
+              )}
+            </div>
+            <div className="portal-user-badge__info">
+              <span className="portal-user-badge__name">
+                {user?.name || "Orbit User"}
               </span>
-              <span className="faint" style={{ fontSize: 11.5, textTransform: 'capitalize' }}>
-                {role ?? '—'}
+              <span className="portal-user-badge__role">
+                {user?.email || "admin@orbit.dev"}
               </span>
-            </span>
-            <span className="faint">▾</span>
-          </button>
+            </div>
+          </div>
+        )}
 
-          <nav className="stack" style={{ gap: 2 }}>
-            <div className="sidebar__section-title">Workspace</div>
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-              >
-                <span className="nav-link__icon">{item.icon}</span>
-                {item.label}
-              </NavLink>
+        <div className="portal-sidebar__workspace-selector">
+          <select
+            className="portal-sidebar__select"
+            value={workspace?.id ?? ""}
+            onChange={(e) => {
+              if (e.target.value === "__new__") {
+                navigate("/workspaces/new");
+              } else {
+                void selectWorkspace(e.target.value);
+              }
+            }}
+            title="Switch Workspace"
+          >
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>
+                {collapsed ? w.name.slice(0, 3) : w.name}
+              </option>
             ))}
-          </nav>
-
-          {workspaces.length === 0 ? (
-            <div className="info-box" style={{ fontSize: 12.5 }}>
-              You are not in a workspace yet. Create one from the <strong>Boards</strong> page.
-            </div>
-          ) : null}
+            <option value="__new__">+ New Workspace...</option>
+          </select>
         </div>
 
-        <div className="sidebar__footer">
-          <Avatar name={user?.name ?? '?'} url={user?.avatarUrl} />
-          <div className="grow" style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.name}
+        <nav className="portal-sidebar__nav">
+          {filteredSections.map((sec) => (
+            <div key={sec.title} className="portal-sidebar__section">
+              {!collapsed && (
+                <span className="portal-sidebar__heading">{sec.title}</span>
+              )}
+              <ul className="portal-sidebar__list">
+                {sec.items.map((item) => (
+                  <li key={item.to}>
+                    <NavLink
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `portal-sidebar__item ${isActive ? "is-active" : ""}`
+                      }
+                      title={collapsed ? item.label : undefined}
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <span className="portal-sidebar__icon">{item.icon}</span>
+                      {!collapsed && (
+                        <span className="portal-sidebar__label">
+                          {item.label}
+                        </span>
+                      )}
+                      {!collapsed && item.badge !== undefined && (
+                        <span className="portal-sidebar__badge">
+                          {item.badge}
+                        </span>
+                      )}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="faint" style={{ fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.email}
+          ))}
+        </nav>
+
+        <div className="portal-sidebar__footer">
+          {!collapsed && (
+            <div className="portal-sidebar__health">
+              <span className={`portal-health-dot ${apiState}`} />
+              <span className="portal-health-label">API: {apiState}</span>
             </div>
+          )}
+          <div className="portal-sidebar__footer-actions">
+            <button
+              className="portal-sidebar__footer-btn"
+              onClick={handleExportData}
+              title="Export personal data"
+            >
+              <Download size={15} />
+            </button>
+            <button
+              className="portal-sidebar__footer-btn"
+              onClick={() => void signOut(false)}
+              title="Sign out"
+            >
+              <LogOut size={15} />
+            </button>
           </div>
-          <button type="button" className="btn btn--ghost btn--icon" onClick={() => setUserMenuOpen(true)} aria-label="Account menu">
-            ⋯
-          </button>
         </div>
       </aside>
 
-      <div className="main">
-        <header className="topbar">
-          <button className="btn mobile-menu" aria-expanded={mobileOpen} aria-label="Toggle navigation" onClick={() => setMobileOpen(!mobileOpen)}>☰</button>
-          <span className="breadcrumb">Workspace <span>/</span> {NAV.find((item) => item.to === location.pathname)?.label ?? 'Board'}</span>
-          <strong>{workspace?.name ?? 'Orbit'}</strong>
-          <Badge tone={apiState === 'ok' ? 'success' : apiState === 'degraded' ? 'warning' : 'danger'}>
-            {apiState === 'checking' ? 'checking…' : apiState === 'ok' ? 'API healthy' : apiState === 'degraded' ? 'API degraded' : 'API unreachable'}
-          </Badge>
-          <div className="topbar__spacer" />
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            style={{ gap: 6, fontSize: 12.5 }}
-            onClick={() => setPaletteOpen(true)}
-          >
-            <span>🔍 Search</span>
-            <kbd style={{ fontSize: 10, opacity: 0.6, background: 'var(--surface-muted)', padding: '2px 4px', borderRadius: 4 }}>
-              ⌘K
-            </kbd>
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost btn--icon"
-            title="Notifications"
-            onClick={() => setNotifOpen(true)}
-          >
-            🔔
-          </button>
-          <ThemeToggle />
-        </header>
-        <ErrorBoundary key={location.pathname} name="Page View">
-          <Outlet />
-        </ErrorBoundary>
-      </div>
-
-      <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      <NotificationDrawer isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
-
-      {switcherOpen ? (
-        <Modal title="Switch workspace" onClose={() => setSwitcherOpen(false)} wide={false}>
-          <div className="stack" style={{ gap: 6 }}>
-            {workspaces.length === 0 ? <p className="muted">You have no workspaces yet.</p> : null}
-            {workspaces.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="workspace-switcher"
-                onClick={() => void onSwitch(item.id)}
-                disabled={item.id === workspace?.id}
-              >
-                <span className="workspace-switcher__avatar">{item.name[0]?.toUpperCase()}</span>
-                <span className="grow">
-                  <span style={{ display: 'block', fontWeight: 600 }}>{item.name}</span>
-                  <span className="faint" style={{ fontSize: 11.5 }}>
-                    {item.slug} · {item.stats.memberCount} member{item.stats.memberCount === 1 ? '' : 's'}
-                  </span>
-                </span>
-                {item.id === workspace?.id ? <Badge tone="accent">current</Badge> : null}
-              </button>
-            ))}
+      <div className="portal-main">
+        <header className="portal-header">
+          <div className="portal-header__left">
+            <button
+              className="portal-header__menu-btn"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Toggle navigation"
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              className="portal-header__search-bar"
+              onClick={() => setPaletteOpen(true)}
+            >
+              <Search size={15} className="portal-header__search-icon" />
+              <span>
+                Search anything in {workspace?.name ?? "workspace"}...
+              </span>
+              <kbd className="portal-header__kbd">⌘K</kbd>
+            </button>
           </div>
-        </Modal>
-      ) : null}
 
-      {userMenuOpen ? (
-        <Modal title="Account" onClose={() => setUserMenuOpen(false)} wide={false}>
-          <div className="stack">
-            <div className="row" style={{ gap: 12 }}>
-              <Avatar name={user?.name ?? '?'} url={user?.avatarUrl} size="lg" />
-              <div>
-                <div style={{ fontWeight: 600 }}>{user?.name}</div>
-                <div className="faint" style={{ fontSize: 12.5 }}>
-                  @{user?.handle} · {user?.email}
-                </div>
-                {user?.emailVerified ? <Badge tone="success">email verified</Badge> : <Badge tone="warning">email not verified</Badge>}
+          <div className="portal-header__right">
+            <div className="theme-switcher">
+              <button
+                type="button"
+                className={`theme-switcher__btn ${theme === "light" ? "is-active" : ""}`}
+                onClick={() => setTheme("light")}
+                title="Light mode"
+              >
+                <Sun size={15} />
+              </button>
+              <button
+                type="button"
+                className={`theme-switcher__btn ${theme === "dark" ? "is-active" : ""}`}
+                onClick={() => setTheme("dark")}
+                title="Dark mode"
+              >
+                <Moon size={15} />
+              </button>
+              <button
+                type="button"
+                className={`theme-switcher__btn ${theme === "system" ? "is-active" : ""}`}
+                onClick={() => setTheme("system")}
+                title="System preference"
+              >
+                <Monitor size={15} />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="portal-header__icon-btn"
+              onClick={() => setNotifOpen(true)}
+              title="Notifications"
+            >
+              <Bell size={18} />
+            </button>
+
+            <div
+              className="portal-header__profile"
+              onClick={() => navigate("/settings")}
+            >
+              <div className="portal-header__avatar">{initial}</div>
+              <div className="portal-header__meta">
+                <span className="portal-header__user-name">{user?.name}</span>
+                <span className="portal-header__user-role">{role}</span>
               </div>
             </div>
-            <button type="button" className="btn btn--block" onClick={() => { setUserMenuOpen(false); navigate('/settings'); }}>
-              Open settings
-            </button>
-            <button type="button" className="btn btn--block" onClick={() => void onSignOut(false)}>
-              Sign out of this device
-            </button>
-            <button type="button" className="btn btn--danger btn--block" onClick={() => void onSignOut(true)}>
-              Sign out everywhere
-            </button>
           </div>
-        </Modal>
-      ) : null}
+        </header>
+
+        <main className="portal-content">
+          <Outlet />
+        </main>
+
+        <footer className="portal-footer">
+          <div className="portal-footer__inner">
+            <div className="portal-footer__copy">
+              © {new Date().getFullYear()} Orbit Technologies. Built for
+              Enterprise Velocity.
+            </div>
+            <div className="portal-footer__links">
+              <a
+                href="#status"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/status");
+                }}
+              >
+                System Status
+              </a>
+              <a
+                href="#docs"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/docs");
+                }}
+              >
+                Documentation
+              </a>
+              <a
+                href="#settings"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/settings");
+                }}
+              >
+                Settings
+              </a>
+              <a
+                href="#chat"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/chat");
+                }}
+              >
+                Support Chat
+              </a>
+            </div>
+          </div>
+        </footer>
+      </div>
+
+      <CommandPalette
+        isOpen={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+      />
+      <NotificationDrawer
+        isOpen={notifOpen}
+        onClose={() => setNotifOpen(false)}
+      />
     </div>
-  );
-}
-
-function ThemeToggle() {
-  const { user, setUser } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const theme = user?.preferences.theme ?? 'system';
-
-  const cycle = async () => {
-    if (!user) return;
-    const next = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark';
-    setBusy(true);
-    try {
-      const updated = await usersApi.updateMe({ preferences: { theme: next } });
-      setUser(updated);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const label = theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : '🖥';
-  return (
-    <button type="button" className="btn btn--ghost btn--icon" onClick={() => void cycle()} disabled={busy} title={`Theme: ${theme}`}>
-      {busy ? <Spinner /> : label}
-    </button>
   );
 }

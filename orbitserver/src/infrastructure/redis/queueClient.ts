@@ -1,8 +1,3 @@
-/**
- * redis-queue client (BUILD_PROMPT rule 5): BullMQ + locks ONLY.
- * noeviction + AOF instance. maxRetriesPerRequest must stay null (BullMQ
- * blocking commands require unlimited retries per request).
- */
 import { Redis } from 'ioredis';
 import { env } from '../../config/env.js';
 import { childLogger } from '../logger/index.js';
@@ -22,8 +17,8 @@ export function createQueueClient(): Redis {
   client = new Redis(env.REDIS_QUEUE_URL, {
     keyPrefix: `${env.REDIS_KEY_PREFIX}:`,
     lazyConnect: true,
-    enableOfflineQueue: true, // queue writes buffer briefly during blips
-    maxRetriesPerRequest: null, // required by BullMQ
+    enableOfflineQueue: true,
+    maxRetriesPerRequest: null,
     retryStrategy: (times) => Math.min(100 * 2 ** Math.min(times, 8), 10_000) + Math.random() * 200,
     connectTimeout: 5_000,
   });

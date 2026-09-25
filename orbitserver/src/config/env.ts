@@ -1,23 +1,19 @@
-/**
- * Zod-validated environment (BUILD_PROMPT Phase 0, rule: env is read ONLY here).
- * The app REFUSES TO START on a missing/invalid value and prints every problem.
- */
 import fs from 'node:fs';
 import { z } from 'zod';
 
-// Load .env when present (never overrides real environment variables).
 const envFile = new URL('../../.env', import.meta.url);
 if (fs.existsSync(envFile)) {
   process.loadEnvFile(envFile);
 }
 
-const booleanish = z
-  .enum(['true', 'false', '1', '0'])
-  .transform((v) => v === 'true' || v === '1');
+const booleanish = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
 
-const commaList = z
-  .string()
-  .transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean));
+const commaList = z.string().transform((v) =>
+  v
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
 
 const duration = z
   .string()
@@ -42,7 +38,6 @@ const schema = z.object({
   TRUST_PROXY: booleanish.default('true'),
   WEB_CONCURRENCY: z.coerce.number().int().min(1).optional(),
 
-  // ── Auth ────────────────────────────────────────────────────────────
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_ALGORITHM: z.enum(['HS256']).default('HS256'),
   JWT_ISSUER: z.string().default('orbit'),
@@ -61,7 +56,6 @@ const schema = z.object({
   RATE_LIMIT_GLOBAL: z.coerce.number().int().min(1).default(300),
   RATE_LIMIT_AUTH: z.coerce.number().int().min(1).default(10),
 
-  // ── MongoDB (Atlas) ─────────────────────────────────────────────────
   MONGODB_URI: z.string().min(10, 'MONGODB_URI is required'),
   MONGO_DB_NAME: z.string().default('orbit'),
   MONGO_MAX_POOL_SIZE: z.coerce.number().int().min(1).default(20),
@@ -70,17 +64,14 @@ const schema = z.object({
   MONGO_REQUIRE_TRANSACTIONS: booleanish.default('false'),
   MONGO_SLOW_QUERY_MS: z.coerce.number().int().min(0).default(200),
 
-  // ── Redis (two instances, never mixed) ──────────────────────────────
   REDIS_CACHE_URL: z.string().optional().default(''),
   REDIS_QUEUE_URL: z.string().optional().default(''),
   REDIS_KEY_PREFIX: z.string().default('orbit:dev'),
   REDIS_CACHE_TTL_DEFAULT: z.coerce.number().int().min(1).default(300),
   CACHE_ENABLED: booleanish.default('true'),
 
-  // ── Queues ──────────────────────────────────────────────────────────
   QUEUE_DISABLED: booleanish.default('true'),
 
-  // ── S3 / MinIO (files pillar) ───────────────────────────────────────
   S3_ENDPOINT: z.string().optional().default(''),
   S3_BUCKET: z.string().default('orbit-files'),
   S3_REGION: z.string().default('us-east-1'),
@@ -88,17 +79,14 @@ const schema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional().default(''),
   S3_FORCE_PATH_STYLE: booleanish.default('true'),
 
-  // ── Mail ────────────────────────────────────────────────────────────
   MAIL_FROM: z.string().default('Orbit <no-reply@orbit.dev>'),
   SMTP_HOST: z.string().optional().default(''),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional().default(1025),
 
-  // ── Health / metrics ────────────────────────────────────────────────
   METRICS_ENABLED: booleanish.default('true'),
   METRICS_TOKEN: z.string().default('internal-scrape-token'),
   HEALTH_DETAILED: booleanish.default('true'),
 
-  // ── Seed (scripts/seed.ts) ──────────────────────────────────────────
   SEED_DEMO_PASSWORD: z.string().min(12).default('Orbit@1234567'),
 });
 
@@ -110,7 +98,7 @@ function parseEnv(): Env {
   const lines = parsed.error.issues.map(
     (issue) => `  • ${issue.path.join('.') || '(root)'}: ${issue.message}`,
   );
-  // Plain stderr — the logger is not built yet (it needs env).
+
   process.stderr.write(
     `\n[orbit] Invalid environment configuration — refusing to start:\n${lines.join('\n')}\n` +
       `\nCopy env.example to .env and fill in the values.\n\n`,
@@ -118,7 +106,6 @@ function parseEnv(): Env {
   process.exit(1);
 }
 
-/** Frozen, typed environment. Import this — never process.env. */
 export const env: Env = Object.freeze(parseEnv());
 
 export const isProd = env.NODE_ENV === 'production';

@@ -1,14 +1,3 @@
-/**
- * Workspaces service (BUILD_PROMPT Phase 5).
- *
- * T1 — workspace bootstrap (ONE transaction):
- *   workspace + owner membership + "Getting Started" board + 3 lists + audit.
- *   Injected failures roll everything back (proven by tests).
- *
- * Invite/accept flows enforce seat limits, dedupe, hashed single-use tokens
- * and LAST_OWNER_PROTECTED rules. Membership changes invalidate the caches so
- * permission changes apply within one request.
- */
 import { createHash, randomBytes } from 'node:crypto';
 import { firstKey, incrementKey, RoleRank, WORKSPACE, type Role } from '@orbit/shared';
 import { env } from '../../config/env.js';
@@ -75,8 +64,6 @@ function hashToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
 }
 
-// ── T1: transactional bootstrap ───────────────────────────────────────
-
 export async function createWorkspaceWithBootstrap(
   input: CreateWorkspaceInput,
   owner: { userId: string; email?: string },
@@ -99,7 +86,7 @@ export async function createWorkspaceWithBootstrap(
       );
       tx.compensate(async () => {
         const { WorkspaceModel } = await import('./workspaces.model.js');
-      await WorkspaceModel.deleteOne({ _id: workspace._id }).exec();
+        await WorkspaceModel.deleteOne({ _id: workspace._id }).exec();
       });
 
       await createMember(
@@ -115,7 +102,6 @@ export async function createWorkspaceWithBootstrap(
         await removeMember(String(workspace._id), owner.userId);
       });
 
-      // Default board with three lists — step 4 of T1 (rollback-test target).
       const board = await createBoard(
         {
           workspaceId: String(workspace._id),
@@ -152,7 +138,6 @@ export async function createWorkspaceWithBootstrap(
     { name: 'T1-workspace-bootstrap' },
   );
 
-  // AFTER commit: caches + events (never inside the transaction).
   await invalidateTag(`user:${owner.userId}:workspaces`);
   emitSafe(`workspace:${String(result.workspace._id)}`, 'workspace:created', {
     workspaceId: String(result.workspace._id),
@@ -167,8 +152,6 @@ export async function createWorkspaceWithBootstrap(
     createdAt: result.workspace.createdAt,
   };
 }
-
-// ── listing (cached) ──────────────────────────────────────────────────
 
 export async function listMyWorkspaces(userId: string): Promise<unknown[]> {
   return getOrSet(
@@ -195,8 +178,6 @@ export async function listMyWorkspaces(userId: string): Promise<unknown[]> {
   );
 }
 
-// ── read / update / archive / delete ──────────────────────────────────
-
 export async function getWorkspace(workspaceId: string): Promise<Record<string, unknown>> {
   const workspace = await findWorkspaceById(workspaceId);
   if (!workspace) throw notFound('Workspace');
@@ -221,16 +202,14 @@ export async function updateWorkspaceSettings(
 ): Promise<Record<string, unknown>> {
   if (input.slug && (await findWorkspaceBySlug(input.slug))) {
     const current = await findWorkspaceById(workspaceId);
-    if (!current || current.slug !== input.slug) throw duplicate('This workspace slug is already taken');
+    if (!current || current.slug !== input.slug)
+      throw duplicate('This workspace slug is already taken');
   }
   const update: Record<string, unknown> = {};
   if (input.name !== undefined) update.name = input.name;
   if (input.slug !== undefined) update.slug = input.slug;
   if (input.logoUrl !== undefined) update.logoUrl = input.logoUrl;
   if (input.settings !== undefined) {
-    // MERGE, never replace: `$set: { settings: {...} }` overwrites the whole
-    // sub-document, so a partial patch (e.g. only `timezone`) would silently
-    // drop weekStart/defaultRole — Mongoose applies defaults on insert only.
     const current = await findWorkspaceById(workspaceId);
     if (!current) throw notFound('Workspace');
     update.settings = { ...current.settings, ...input.settings };
@@ -247,7 +226,7 @@ export async function updateWorkspaceSettings(
     workspaceId,
     after: update,
   });
-  // Per-user workspace lists expire within their 60 s TTL; the actor sees it now.
+
   await invalidateTag(`user:${actor.userId}:workspaces`);
   return getWorkspace(workspaceId);
 }
@@ -260,9 +239,15 @@ export async function archiveOrDeleteWorkspace(
   const workspace = await findWorkspaceById(workspaceId);
   if (!workspace) throw notFound('Workspace');
   if (workspace.slug !== confirmSlug) {
-    throw new ApiError('VALIDATION_ERROR', 'Confirmation slug does not match the workspace', { status: 422 });
+    throw new ApiError('VALIDATION_ERROR', 'Confirmation slug does not match the workspace', {
+      status: 422,
+    });
   }
-  await updateWorkspace(workspaceId, { deletedAt: new Date(), deletedBy: actor.userId, archivedAt: new Date() });
+  await updateWorkspace(workspaceId, {
+    deletedAt: new Date(),
+    deletedBy: actor.userId,
+    archivedAt: new Date(),
+  });
   await recordAudit({
     actorId: actor.userId,
     actorRole: actor.role,
@@ -273,8 +258,6 @@ export async function archiveOrDeleteWorkspace(
     before: { name: workspace.name, slug: workspace.slug },
   });
 }
-
-// ── members ───────────────────────────────────────────────────────────
 
 export async function listMembersWithProfiles(
   workspaceId: string,
@@ -310,8 +293,7 @@ export async function updateMember(
 
   if (input.role && input.role !== target.role) {
     if (target.role === 'owner') throw lastOwnerProtected();
-    // Nobody edits their own role — ownership moves only via transfer-ownership,
-    // and a self-service role change would be a privilege-escalation shortcut.
+
     if (actor.userId === targetUserId) {
       throw forbiddenRole('You cannot change your own role — ask another owner or admin');
     }
@@ -362,13 +344,16 @@ export async function removeMemberFromWorkspace(
     throw forbiddenRole('You cannot remove an equal or higher-ranked member');
   }
 
-  // T4: remove membership + decrement stats + prune card assignments + audit.
   await runInTransaction(
     async (tx) => {
       await removeMember(workspaceId, targetUserId, tx.session);
       tx.compensate(async () => {
-        // Compensation runs AFTER the failed transaction — fresh session-less write.
-        await createMember({ workspaceId, userId: targetUserId, role: target.role, status: target.status });
+        await createMember({
+          workspaceId,
+          userId: targetUserId,
+          role: target.role,
+          status: target.status,
+        });
       });
       await incWorkspaceStats(workspaceId, { memberCount: -1 }, tx.session);
       await pruneAssignee(workspaceId, targetUserId, tx.session);
@@ -395,10 +380,7 @@ export async function removeMemberFromWorkspace(
   });
 }
 
-export async function leaveWorkspace(
-  workspaceId: string,
-  userId: string,
-): Promise<void> {
+export async function leaveWorkspace(workspaceId: string, userId: string): Promise<void> {
   const membership = await findMembership(workspaceId, userId);
   if (!membership) throw notFound('Membership');
   if (membership.role === 'owner' && (await countOwners(workspaceId)) <= 1) {
@@ -432,7 +414,9 @@ export async function transferOwnership(
   const workspace = await findWorkspaceById(workspaceId);
   if (!workspace) throw notFound('Workspace');
   if (workspace.slug !== input.confirm) {
-    throw new ApiError('VALIDATION_ERROR', 'Confirmation must match the workspace slug', { status: 422 });
+    throw new ApiError('VALIDATION_ERROR', 'Confirmation must match the workspace slug', {
+      status: 422,
+    });
   }
   const target = await findMembership(workspaceId, input.toUserId);
   if (!target) throw notFound('Member');
@@ -463,10 +447,11 @@ export async function transferOwnership(
   await invalidateMembershipCache(workspaceId, input.toUserId);
   await invalidateAuthSnapshot(actor.userId);
   await invalidateAuthSnapshot(input.toUserId);
-  emitSafe(`workspace:${workspaceId}`, 'workspace:member:changed', { workspaceId, transferred: true });
+  emitSafe(`workspace:${workspaceId}`, 'workspace:member:changed', {
+    workspaceId,
+    transferred: true,
+  });
 }
-
-// ── invitations ───────────────────────────────────────────────────────
 
 export async function inviteMember(
   workspaceId: string,
@@ -482,7 +467,8 @@ export async function inviteMember(
   const workspace = await findWorkspaceById(workspaceId);
   if (!workspace) throw notFound('Workspace');
 
-  if (RoleRank[input.role] >= RoleRank[actor.role]) throw forbiddenRole('You can only invite a lower-ranked role');
+  if (RoleRank[input.role] >= RoleRank[actor.role])
+    throw forbiddenRole('You can only invite a lower-ranked role');
   const memberCount = await countMembers(workspaceId);
   if (memberCount >= workspace.seatLimit) throw seatLimitReached();
 
@@ -521,17 +507,11 @@ export async function inviteMember(
     after: { email: input.email, role: input.role },
   });
 
-  // The raw token exists ONLY here — the database keeps its SHA-256 hash.
-  // SMTP is not wired until the mail queue lands, so outside production we
-  // hand the token back to the inviter to keep the invite → accept flow
-  // testable end to end. Production returns nothing extra: email is the only
-  // delivery channel there.
   const acceptToken = env.NODE_ENV === 'production' ? undefined : raw;
 
   return { invited: true, email: input.email, role: input.role, expiresAt, acceptToken };
 }
 
-/** Invitations for a workspace, with a derived state the UI can render. */
 export async function listInvitations(workspaceId: string): Promise<unknown[]> {
   const invitations = await findInvitationsByWorkspace(workspaceId);
   const now = Date.now();
@@ -552,7 +532,6 @@ export async function listInvitations(workspaceId: string): Promise<unknown[]> {
   }));
 }
 
-/** T6 — accept invite: idempotent, transactional membership upsert. */
 export async function acceptInvite(
   token: string,
   user: { userId: string; email: string },
@@ -564,7 +543,6 @@ export async function acceptInvite(
     throw forbiddenRole('This invitation was issued to a different email address');
   }
 
-  // Idempotent: double-accept returns the membership, never duplicates it.
   const existing = await findMembership(invitation.workspaceId, user.userId);
   if (existing && invitation.acceptedAt) {
     return { workspaceId: invitation.workspaceId, role: existing.role };
@@ -579,9 +557,9 @@ export async function acceptInvite(
     async (tx) => {
       const accepted = await markInvitationAccepted(String(invitation._id), tx.session);
       if (!accepted && !existing) {
-        // Lost a concurrent accept race — re-read the membership.
         const raced = await findMembership(invitation.workspaceId, user.userId, tx.session);
-        if (raced) return { workspaceId: invitation.workspaceId, role: raced.role, duplicateAccept: true };
+        if (raced)
+          return { workspaceId: invitation.workspaceId, role: raced.role, duplicateAccept: true };
         throw inviteExpired();
       }
       let membership = existing;
@@ -631,12 +609,10 @@ export async function declineInvite(token: string, user: { email: string }): Pro
   await markInvitationDeclined(String(invitation._id));
 }
 
-/** Helper used by auth: the default workspace scope for fresh tokens. */
 export async function getDefaultMembership(userId: string): Promise<MemberDoc | null> {
   return findPrimaryMembership(userId);
 }
 
-/** Load a user doc (used by controllers to pass email into invite flows). */
 export async function loadUserOr404(userId: string): Promise<UserDoc> {
   const user = await findUserById(userId);
   if (!user) throw notFound('User');

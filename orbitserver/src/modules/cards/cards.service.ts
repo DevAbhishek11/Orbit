@@ -1,12 +1,3 @@
-/**
- * Cards service (BUILD_PROMPT Phase 6) — the Trello pillar's core.
- *
- * T2 (card move) runs INSIDE one transaction:
- *   card (version-guarded) + source/target list counters + activity + audit.
- * AFTER commit (never inside): cache invalidation, socket emit, notification
- * job. Stale versions answer 409 VERSION_CONFLICT WITH the current card.
- * Exhausted order keys answer 409 ORDER_KEY_EXHAUSTED + enqueue rebalance.
- */
 import { nanoid } from 'nanoid';
 import { firstKey, incrementKey, keyBetween, evenKeys } from '@orbit/shared';
 import { runInTransaction } from '../../infrastructure/db/transaction.js';
@@ -24,7 +15,12 @@ import { createActivity, listEntityActivity } from '../activities/activities.rep
 import { recordAudit } from '../audit/audit.service.js';
 import { extractMentionHandles } from '../comments/comments.model.js';
 import { createComment, listComments } from '../comments/comments.repository.js';
-import { findBoardByIdScoped, findListById, incBoardStats, incListCardCount } from '../boards/boards.repository.js';
+import {
+  findBoardByIdScoped,
+  findListById,
+  incBoardStats,
+  incListCardCount,
+} from '../boards/boards.repository.js';
 import { findUsersByHandles } from '../users/users.repository.js';
 import { computeChecklistProgress, CardModel } from './cards.model.js';
 import {
@@ -60,11 +56,9 @@ export function serializeCard(card: CardDoc): Record<string, unknown> {
 
 async function loadCardOr404(cardId: string, workspaceId: string): Promise<CardDoc> {
   const card = await findCardByIdScoped(cardId, workspaceId);
-  if (!card) throw notFound('Card'); // cross-tenant → 404, never 403
+  if (!card) throw notFound('Card');
   return card;
 }
-
-// ── create ────────────────────────────────────────────────────────────
 
 export async function createCardInList(
   listId: string,
@@ -112,7 +106,14 @@ export async function createCardInList(
       await incListCardCount(listId, 1, tx.session);
       await incBoardStats(list.boardId, { cardCount: 1 }, tx.session);
       await createActivity(
-        { workspaceId, entityType: 'card', entityId: String(created._id), actorId: actor.userId, action: 'created', meta: { listId, title: created.title } },
+        {
+          workspaceId,
+          entityType: 'card',
+          entityId: String(created._id),
+          actorId: actor.userId,
+          action: 'created',
+          meta: { listId, title: created.title },
+        },
         tx.session,
       );
       await recordAudit({
@@ -179,11 +180,14 @@ async function afterCommit(
   });
 }
 
-// ── read ──────────────────────────────────────────────────────────────
-
-export async function getCardDetails(cardId: string, workspaceId: string): Promise<Record<string, unknown>> {
+export async function getCardDetails(
+  cardId: string,
+  workspaceId: string,
+): Promise<Record<string, unknown>> {
   const card = await loadCardOr404(cardId, workspaceId);
-  const assignees = await import('../users/users.repository.js').then((r) => r.findUsersByIds(card.assignees));
+  const assignees = await import('../users/users.repository.js').then((r) =>
+    r.findUsersByIds(card.assignees),
+  );
   return {
     ...serializeCard(card),
     assigneeProfiles: assignees.map((u) => ({
@@ -210,7 +214,11 @@ export async function listBoardCards(
   return { cards: result.cards.map(serializeCard), nextCursor: result.nextCursor };
 }
 
-export async function getCardActivity(cardId: string, workspaceId: string, query: { limit?: number; cursor?: string }): Promise<unknown> {
+export async function getCardActivity(
+  cardId: string,
+  workspaceId: string,
+  query: { limit?: number; cursor?: string },
+): Promise<unknown> {
   await loadCardOr404(cardId, workspaceId);
   return listEntityActivity('card', cardId, query);
 }
@@ -220,8 +228,6 @@ export async function getCardComments(cardId: string, workspaceId: string): Prom
   const comments = await listComments('card', cardId);
   return comments.map((c) => ({ ...c, id: String(c._id) }));
 }
-
-// ── update ────────────────────────────────────────────────────────────
 
 export async function updateCardDetails(
   cardId: string,
@@ -233,7 +239,16 @@ export async function updateCardDetails(
   if (card.version !== input.version) throw versionConflict(card);
 
   const update: Record<string, unknown> = {};
-  for (const key of ['title', 'description', 'labels', 'assignees', 'dueAt', 'startAt', 'priority', 'coverColor'] as const) {
+  for (const key of [
+    'title',
+    'description',
+    'labels',
+    'assignees',
+    'dueAt',
+    'startAt',
+    'priority',
+    'coverColor',
+  ] as const) {
     if (input[key] !== undefined) update[key] = input[key];
   }
   if (input.checklists !== undefined) {
@@ -251,12 +266,18 @@ export async function updateCardDetails(
     async (tx) => {
       const result = await updateCardWithVersionGuard(cardId, input.version, update, tx.session);
       if (!result) {
-        // Concurrent writer won between our read and the guarded update.
         const current = await findCardByIdScoped(cardId, workspaceId);
         throw current ? versionConflict(current) : notFound('Card');
       }
       await createActivity(
-        { workspaceId, entityType: 'card', entityId: cardId, actorId: actor.userId, action: 'updated', meta: { fields: Object.keys(update) } },
+        {
+          workspaceId,
+          entityType: 'card',
+          entityId: cardId,
+          actorId: actor.userId,
+          action: 'updated',
+          meta: { fields: Object.keys(update) },
+        },
         tx.session,
       );
       await recordAudit({
@@ -301,12 +322,14 @@ function pickChanged(card: CardDoc, update: Record<string, unknown>): Record<str
 }
 
 function versionConflict(current: CardDoc): ApiError {
-  return new ApiError('VERSION_CONFLICT', 'This card was modified by someone else — reload and retry', {
-    details: { current: serializeCard(current), currentVersion: current.version },
-  });
+  return new ApiError(
+    'VERSION_CONFLICT',
+    'This card was modified by someone else — reload and retry',
+    {
+      details: { current: serializeCard(current), currentVersion: current.version },
+    },
+  );
 }
-
-// ── T2: transactional move ────────────────────────────────────────────
 
 export async function moveCard(
   cardId: string,
@@ -324,19 +347,32 @@ export async function moveCard(
   if (crossBoard) {
     const targetBoard = await findBoardByIdScoped(targetList.boardId, workspaceId);
     if (!targetBoard) throw notFound('Board');
-    if (targetBoard.visibility === 'private' && !['owner', 'admin'].includes(actor.role) && targetBoard.createdBy !== actor.userId && !targetBoard.memberIds.includes(actor.userId)) throw notFound('Board');
+    if (
+      targetBoard.visibility === 'private' &&
+      !['owner', 'admin'].includes(actor.role) &&
+      targetBoard.createdBy !== actor.userId &&
+      !targetBoard.memberIds.includes(actor.userId)
+    )
+      throw notFound('Board');
   }
 
-  // Neighbours must live in the TARGET list.
   const neighbors = await findNeighborCards(
     String(targetList._id),
     input.beforeCardId ?? undefined,
     input.afterCardId ?? undefined,
   );
-  if (input.beforeCardId && !neighbors.before) throw badRequest('beforeCardId not found in the target list');
-  if (input.afterCardId && !neighbors.after) throw badRequest('afterCardId not found in the target list');
+  if (input.beforeCardId && !neighbors.before)
+    throw badRequest('beforeCardId not found in the target list');
+  if (input.afterCardId && !neighbors.after)
+    throw badRequest('afterCardId not found in the target list');
 
-  const prevOrder = neighbors.before?.order ?? (await precedingOrderInTarget(String(targetList._id), input.afterCardId ? neighbors.after!.order : null, cardId));
+  const prevOrder =
+    neighbors.before?.order ??
+    (await precedingOrderInTarget(
+      String(targetList._id),
+      input.afterCardId ? neighbors.after!.order : null,
+      cardId,
+    ));
   const nextOrder = neighbors.after?.order ?? null;
   if (prevOrder && nextOrder && prevOrder >= nextOrder) {
     throw new ApiError('ORDER_CONFLICT', 'Neighbour hints are contradictory', {
@@ -349,9 +385,14 @@ export async function moveCard(
     order = keyBetween(prevOrder, nextOrder);
   } catch (err) {
     if ((err as Error).message.includes('exhausted')) {
-      await enqueue('cleanup', 'rebalance-list', { listId: String(targetList._id) }, {
-        dedupeKey: `rebalance:${String(targetList._id)}`,
-      });
+      await enqueue(
+        'cleanup',
+        'rebalance-list',
+        { listId: String(targetList._id) },
+        {
+          dedupeKey: `rebalance:${String(targetList._id)}`,
+        },
+      );
       throw orderKeyExhausted();
     }
     if ((err as Error).message.includes('out of order')) {
@@ -411,7 +452,6 @@ export async function moveCard(
     { name: 'T2-card-move' },
   );
 
-  // AFTER commit — cache, sockets, notifications. Never inside the tx.
   await invalidateTag(`board:${sourceBoardId}`);
   if (crossBoard) await invalidateTag(`board:${targetList.boardId}`);
   emitSafe(`board:${sourceBoardId}`, 'card:moved', {
@@ -431,7 +471,6 @@ export async function moveCard(
   return serializeCard(moved);
 }
 
-/** When only afterCardId is given, find the card that precedes it (skipping the moving card). */
 async function precedingOrderInTarget(
   targetListId: string,
   afterOrder: string | null,
@@ -447,9 +486,11 @@ async function precedingOrderInTarget(
   return card?.order ?? null;
 }
 
-// ── delete / restore ──────────────────────────────────────────────────
-
-export async function deleteCardSoft(cardId: string, workspaceId: string, actor: Actor): Promise<void> {
+export async function deleteCardSoft(
+  cardId: string,
+  workspaceId: string,
+  actor: Actor,
+): Promise<void> {
   const card = await loadCardOr404(cardId, workspaceId);
   await runInTransaction(
     async (tx) => {
@@ -470,12 +511,18 @@ export async function deleteCardSoft(cardId: string, workspaceId: string, actor:
     { name: 'delete-card' },
   );
   await invalidateTag(`board:${card.boardId}`);
-  emitSafe(`board:${card.boardId}`, 'card:deleted', { cardId, boardId: card.boardId, actorId: actor.userId });
+  emitSafe(`board:${card.boardId}`, 'card:deleted', {
+    cardId,
+    boardId: card.boardId,
+    actorId: actor.userId,
+  });
 }
 
-export async function restoreSoftDeletedCard(cardId: string, workspaceId: string, actor: Actor): Promise<Record<string, unknown>> {
-  // Tenant check BEFORE the write — a cross-tenant id must answer 404 without
-  // touching the document (rule 6: no cross-tenant writes, no enumeration).
+export async function restoreSoftDeletedCard(
+  cardId: string,
+  workspaceId: string,
+  actor: Actor,
+): Promise<Record<string, unknown>> {
   const existing = await findCardByIdIncludingDeleted(cardId);
   if (!existing || existing.workspaceId !== workspaceId) throw notFound('Card');
 
@@ -498,12 +545,18 @@ export async function restoreSoftDeletedCard(cardId: string, workspaceId: string
     { name: 'restore-card' },
   );
   await invalidateTag(`board:${card.boardId}`);
-  emitSafe(`board:${card.boardId}`, 'card:created', { card: serializeCard(card), boardId: card.boardId, restored: true });
+  emitSafe(`board:${card.boardId}`, 'card:created', {
+    card: serializeCard(card),
+    boardId: card.boardId,
+    restored: true,
+  });
   return serializeCard(card);
 }
 
-/** Rebalance a list's order keys (weekly job + ORDER_KEY_EXHAUSTED remedy). */
-export async function rebalanceListOrder(listId: string, workspaceId: string): Promise<{ count: number }> {
+export async function rebalanceListOrder(
+  listId: string,
+  workspaceId: string,
+): Promise<{ count: number }> {
   const list = await findListById(listId);
   if (!list || list.workspaceId !== workspaceId) throw notFound('List');
   const cards = await CardModel.find({ listId, archivedAt: null })
@@ -530,14 +583,11 @@ export async function rebalanceListOrder(listId: string, workspaceId: string): P
   return { count: cards.length };
 }
 
-// ── C1 + T3 — create card from message (cross-pillar transaction) ──────
-
 export async function createCardFromMessage(
   workspaceId: string,
   input: CreateCardFromMessageInput,
   actor: Actor,
 ): Promise<Record<string, unknown>> {
-  // Load source message
   const { findMessageById } = await import('../chat/chat.repository.js');
   const message = await findMessageById(input.messageId);
   if (!message || message.workspaceId !== workspaceId) throw notFound('Message');
@@ -547,7 +597,6 @@ export async function createCardFromMessage(
 
   let targetListId = input.listId;
   if (!targetListId) {
-    // Use first list of board as default
     const { findListsByBoard } = await import('../boards/boards.repository.js');
     const lists = await findListsByBoard(input.boardId);
     if (lists.length === 0) throw notFound('List — board has no lists');
@@ -555,7 +604,8 @@ export async function createCardFromMessage(
   }
 
   const list = await findListById(targetListId);
-  if (!list || list.workspaceId !== workspaceId || list.boardId !== input.boardId) throw notFound('List');
+  if (!list || list.workspaceId !== workspaceId || list.boardId !== input.boardId)
+    throw notFound('List');
 
   const title = input.title?.trim() || message.body.slice(0, 100) || 'Card from message';
   const order = await computeInsertOrder(targetListId, null);
@@ -603,7 +653,6 @@ export async function createCardFromMessage(
         session: tx.session,
       });
 
-      // Post thread reply in source channel with card permalink
       const { createMessage, updateMessageById } = await import('../chat/chat.repository.js');
       const reply = await createMessage(
         {
@@ -617,7 +666,6 @@ export async function createCardFromMessage(
         tx.session,
       );
 
-      // Bump replyCount on root
       const rootId = message.threadRootId ?? message._id.toString();
       await updateMessageById(
         rootId,
@@ -651,14 +699,10 @@ export async function createCardFromMessage(
       messageId: input.messageId,
       actorId: actor.userId,
     });
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   return serializeCard(card);
 }
-
-// ── comments (unified collection) ─────────────────────────────────────
 
 export async function addCardComment(
   cardId: string,
@@ -686,7 +730,13 @@ export async function addCardComment(
       );
       await incCardCommentCount(cardId, 1, tx.session);
       await createActivity(
-        { workspaceId, entityType: 'card', entityId: cardId, actorId: actor.userId, action: 'commented' },
+        {
+          workspaceId,
+          entityType: 'card',
+          entityId: cardId,
+          actorId: actor.userId,
+          action: 'commented',
+        },
         tx.session,
       );
       await recordAudit({
@@ -707,12 +757,17 @@ export async function addCardComment(
   emitSafe(`board:${card.boardId}`, 'comment:new', {
     cardId,
     boardId: card.boardId,
-    comment: { id: String(comment._id), body: comment.body, authorId: comment.authorId, createdAt: comment.createdAt },
+    comment: {
+      id: String(comment._id),
+      body: comment.body,
+      authorId: comment.authorId,
+      createdAt: comment.createdAt,
+    },
     clientMutationId: input.clientMutationId,
     actorId: actor.userId,
   });
   const recipients = new Set([...card.watcherIds, ...card.assignees, ...mentionIds]);
-  recipients.delete(actor.userId); // never notify the actor
+  recipients.delete(actor.userId);
   if (recipients.size > 0) {
     await enqueue('notifications', 'card-comment', {
       cardId,
@@ -722,5 +777,11 @@ export async function addCardComment(
       commentId: String(comment._id),
     });
   }
-  return { id: String(comment._id), body: comment.body, authorId: comment.authorId, mentions: comment.mentions, createdAt: comment.createdAt };
+  return {
+    id: String(comment._id),
+    body: comment.body,
+    authorId: comment.authorId,
+    mentions: comment.mentions,
+    createdAt: comment.createdAt,
+  };
 }

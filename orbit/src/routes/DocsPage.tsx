@@ -1,16 +1,20 @@
-/**
- * Notion-style Docs/Pages screen (BUILD_PROMPT Phase 7 & 13):
- * Nested tree navigation, block-based content editor, version snapshots,
- * favourites, and autosave conflict management.
- */
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { pagesApi } from '../api/endpoints';
-import type { Page, PageBlock, PageVersion } from '../api/types';
-import { useAuth } from '../state/auth';
-import { useToast } from '../state/toast';
-import { Badge, CenterState, ConfirmDialog, EmptyState, ErrorBox, Field, Modal, Spinner } from '../components/ui';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { pagesApi } from "../api/endpoints";
+import type { Page, PageBlock, PageVersion } from "../api/types";
+import { useAuth } from "../state/auth";
+import { useToast } from "../state/toast";
+import {
+  Badge,
+  CenterState,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBox,
+  Field,
+  Modal,
+  Spinner,
+} from "../components/ui";
 
 export function DocsPage() {
   const { workspaceId, role } = useAuth();
@@ -20,69 +24,78 @@ export function DocsPage() {
   const navigate = useNavigate();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [newPageTitle, setNewPageTitle] = useState('');
+  const [newPageTitle, setNewPageTitle] = useState("");
   const [parentForNewPage, setParentForNewPage] = useState<string | null>(null);
   const [versionsModalOpen, setVersionsModalOpen] = useState(false);
 
-  const readOnly = role === 'viewer';
+  const readOnly = role === "viewer";
 
-  // Load page tree
   const treeQuery = useQuery({
-    queryKey: ['pages-tree', workspaceId],
+    queryKey: ["pages-tree", workspaceId],
     queryFn: () => pagesApi.tree(workspaceId as string),
     enabled: Boolean(workspaceId),
   });
 
   const pages = useMemo(() => treeQuery.data?.pages ?? [], [treeQuery.data]);
 
-  // If no pageId is selected but pages exist, select the first page
   useEffect(() => {
     if (!pageId && pages.length > 0 && pages[0]?.id) {
       navigate(`/docs/${pages[0].id}`, { replace: true });
     }
   }, [pageId, pages, navigate]);
 
-  // Load active page
   const pageQuery = useQuery({
-    queryKey: ['page', pageId],
+    queryKey: ["page", pageId],
     queryFn: () => pagesApi.get(pageId as string),
     enabled: Boolean(pageId),
   });
 
   const activePage = pageQuery.data?.page;
 
-  // Create page mutation
   const createMutation = useMutation({
     mutationFn: (data: { title: string; parentId?: string | null }) =>
       pagesApi.create(workspaceId as string, data),
     onSuccess: (res) => {
-      toast.success('Doc created');
-      void queryClient.invalidateQueries({ queryKey: ['pages-tree', workspaceId] });
+      toast.success("Doc created");
+      void queryClient.invalidateQueries({
+        queryKey: ["pages-tree", workspaceId],
+      });
       setCreateModalOpen(false);
-      setNewPageTitle('');
+      setNewPageTitle("");
       setParentForNewPage(null);
       navigate(`/docs/${res.page.id}`);
     },
-    onError: (err: Error) => toast.error('Could not create doc', err.message),
+    onError: (err: Error) => toast.error("Could not create doc", err.message),
   });
 
   return (
-    <div className="docs-layout" style={{ display: 'flex', height: 'calc(100vh - 56px)' }}>
-      {/* Sidebar: Tree view */}
+    <div
+      className="docs-layout"
+      style={{ display: "flex", height: "calc(100vh - 56px)" }}
+    >
+      {}
       <aside
         className="docs-sidebar"
         style={{
           width: 280,
-          borderRight: '1px solid var(--border)',
-          padding: '16px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'var(--surface-muted, var(--surface))',
-          overflowY: 'auto',
+          borderRight: "1px solid var(--border)",
+          padding: "16px 12px",
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--surface-muted, var(--surface))",
+          overflowY: "auto",
         }}
       >
         <div className="row row--between" style={{ marginBottom: 12 }}>
-          <strong style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>Docs & Wiki</strong>
+          <strong
+            style={{
+              fontSize: 13,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+            }}
+          >
+            Docs & Wiki
+          </strong>
           {!readOnly && (
             <button
               type="button"
@@ -111,24 +124,32 @@ export function DocsPage() {
                 style={{
                   paddingLeft: indent,
                   borderRadius: 6,
-                  background: isSelected ? 'var(--accent-subtle)' : 'transparent',
+                  background: isSelected
+                    ? "var(--accent-subtle)"
+                    : "transparent",
                 }}
               >
                 <button
                   type="button"
                   className="btn btn--ghost grow"
                   style={{
-                    textAlign: 'left',
-                    justifyContent: 'flex-start',
+                    textAlign: "left",
+                    justifyContent: "flex-start",
                     gap: 6,
-                    padding: '6px 8px',
+                    padding: "6px 8px",
                     fontWeight: isSelected ? 600 : 400,
                   }}
                   onClick={() => navigate(`/docs/${p.id}`)}
                 >
-                  <span>{p.icon || '📄'}</span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.title || 'Untitled'}
+                  <span>{p.icon || "📄"}</span>
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {p.title || "Untitled"}
                   </span>
                 </button>
                 {!readOnly && (
@@ -150,15 +171,18 @@ export function DocsPage() {
             );
           })}
           {pages.length === 0 && !treeQuery.isLoading && (
-            <p className="faint" style={{ fontSize: 12.5, margin: '12px 0' }}>
+            <p className="faint" style={{ fontSize: 12.5, margin: "12px 0" }}>
               No docs yet. Create your first doc!
             </p>
           )}
         </nav>
       </aside>
 
-      {/* Main editor area */}
-      <main className="docs-content grow" style={{ overflowY: 'auto', padding: '32px 48px' }}>
+      {}
+      <main
+        className="docs-content grow"
+        style={{ overflowY: "auto", padding: "32px 48px" }}
+      >
         {pageQuery.isLoading && (
           <CenterState>
             <Spinner large />
@@ -179,7 +203,11 @@ export function DocsPage() {
             title="Knowledge Base & Docs"
             hint="Create nested docs, wikis, and structured notes with version history."
             action={
-              <button type="button" className="btn btn--primary" onClick={() => setCreateModalOpen(true)}>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => setCreateModalOpen(true)}
+              >
                 + New Document
               </button>
             }
@@ -193,14 +221,18 @@ export function DocsPage() {
             readOnly={readOnly}
             workspaceId={workspaceId!}
             onOpenVersions={() => setVersionsModalOpen(true)}
-            onDeleted={() => navigate('/docs')}
+            onDeleted={() => navigate("/docs")}
           />
         )}
       </main>
 
-      {/* Create page dialog */}
+      {}
       {createModalOpen && (
-        <Modal title="Create New Document" onClose={() => setCreateModalOpen(false)} wide={false}>
+        <Modal
+          title="Create New Document"
+          onClose={() => setCreateModalOpen(false)}
+          wide={false}
+        >
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -229,7 +261,11 @@ export function DocsPage() {
               </p>
             )}
             <div className="row row--end" style={{ gap: 8, marginTop: 12 }}>
-              <button type="button" className="btn" onClick={() => setCreateModalOpen(false)}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setCreateModalOpen(false)}
+              >
                 Cancel
               </button>
               <button
@@ -237,16 +273,19 @@ export function DocsPage() {
                 className="btn btn--primary"
                 disabled={!newPageTitle.trim() || createMutation.isPending}
               >
-                {createMutation.isPending ? <Spinner /> : 'Create Doc'}
+                {createMutation.isPending ? <Spinner /> : "Create Doc"}
               </button>
             </div>
           </form>
         </Modal>
       )}
 
-      {/* Version history modal */}
+      {}
       {versionsModalOpen && pageId && (
-        <VersionHistoryModal pageId={pageId} onClose={() => setVersionsModalOpen(false)} />
+        <VersionHistoryModal
+          pageId={pageId}
+          onClose={() => setVersionsModalOpen(false)}
+        />
       )}
     </div>
   );
@@ -272,57 +311,74 @@ function DocEditor({
   const [blocks, setBlocks] = useState<PageBlock[]>(
     activePage.blocks?.length
       ? activePage.blocks
-      : [{ id: 'b1', type: 'paragraph', content: '', order: 'V' }],
+      : [{ id: "b1", type: "paragraph", content: "", order: "V" }],
   );
   const [isDirty, setIsDirty] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(new Date(activePage.updatedAt));
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(
+    new Date(activePage.updatedAt),
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Save page mutation
   const saveMutation = useMutation({
-    mutationFn: (data: { title: string; blocks: PageBlock[]; version: number }) =>
-      pagesApi.update(activePage.id, data.version, { title: data.title, blocks: data.blocks }),
+    mutationFn: (data: {
+      title: string;
+      blocks: PageBlock[];
+      version: number;
+    }) =>
+      pagesApi.update(activePage.id, data.version, {
+        title: data.title,
+        blocks: data.blocks,
+      }),
     onSuccess: (res) => {
       setIsDirty(false);
       setLastSavedAt(new Date());
-      queryClient.setQueryData(['page', activePage.id], res);
-      void queryClient.invalidateQueries({ queryKey: ['pages-tree', workspaceId] });
+      queryClient.setQueryData(["page", activePage.id], res);
+      void queryClient.invalidateQueries({
+        queryKey: ["pages-tree", workspaceId],
+      });
     },
     onError: (err: { code?: string; message?: string }) => {
-      if (err.code === 'VERSION_CONFLICT') {
-        toast.error('Version conflict', 'Another user edited this page. Reloading latest.');
-        void queryClient.invalidateQueries({ queryKey: ['page', activePage.id] });
+      if (err.code === "VERSION_CONFLICT") {
+        toast.error(
+          "Version conflict",
+          "Another user edited this page. Reloading latest.",
+        );
+        void queryClient.invalidateQueries({
+          queryKey: ["page", activePage.id],
+        });
       } else {
-        toast.error('Save failed', err.message);
+        toast.error("Save failed", err.message);
       }
     },
   });
 
-  // Delete page mutation
   const deleteMutation = useMutation({
     mutationFn: () => pagesApi.remove(activePage.id),
     onSuccess: () => {
-      toast.success('Doc deleted');
-      void queryClient.invalidateQueries({ queryKey: ['pages-tree', workspaceId] });
+      toast.success("Doc deleted");
+      void queryClient.invalidateQueries({
+        queryKey: ["pages-tree", workspaceId],
+      });
       setConfirmDelete(false);
       onDeleted();
     },
-    onError: (err: Error) => toast.error('Could not delete doc', err.message),
+    onError: (err: Error) => toast.error("Could not delete doc", err.message),
   });
 
-  // Favourite toggle
   const favouriteMutation = useMutation({
     mutationFn: () => pagesApi.toggleFavourite(activePage.id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['pages-tree', workspaceId] });
-      void queryClient.invalidateQueries({ queryKey: ['page', activePage.id] });
+      void queryClient.invalidateQueries({
+        queryKey: ["pages-tree", workspaceId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["page", activePage.id] });
     },
   });
 
   const handleSave = () => {
     if (!isDirty) return;
     saveMutation.mutate({
-      title: title.trim() || 'Untitled',
+      title: title.trim() || "Untitled",
       blocks,
       version: activePage.version,
     });
@@ -337,7 +393,7 @@ function DocEditor({
     }
   };
 
-  const changeBlockType = (index: number, type: PageBlock['type']) => {
+  const changeBlockType = (index: number, type: PageBlock["type"]) => {
     const updated = [...blocks];
     if (updated[index]) {
       updated[index] = { ...updated[index], type };
@@ -355,11 +411,14 @@ function DocEditor({
     }
   };
 
-  const addBlock = (afterIndex: number, type: PageBlock['type'] = 'paragraph') => {
+  const addBlock = (
+    afterIndex: number,
+    type: PageBlock["type"] = "paragraph",
+  ) => {
     const newBlock: PageBlock = {
       id: Math.random().toString(36).slice(2, 10),
       type,
-      content: '',
+      content: "",
       order: String(Date.now()),
     };
     const updated = [...blocks];
@@ -376,11 +435,18 @@ function DocEditor({
   };
 
   return (
-    <div style={{ maxWidth: 840, margin: '0 auto' }}>
-      {/* Action Bar */}
-      <div className="row row--between" style={{ marginBottom: 24, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+    <div style={{ maxWidth: 840, margin: "0 auto" }}>
+      {}
+      <div
+        className="row row--between"
+        style={{
+          marginBottom: 24,
+          paddingBottom: 12,
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
         <div className="row" style={{ gap: 8 }}>
-          <span style={{ fontSize: 24 }}>{activePage.icon || '📄'}</span>
+          <span style={{ fontSize: 24 }}>{activePage.icon || "📄"}</span>
           <Badge tone="accent">v{activePage.version}</Badge>
           {lastSavedAt && (
             <span className="faint" style={{ fontSize: 12 }}>
@@ -412,7 +478,7 @@ function DocEditor({
               disabled={saveMutation.isPending}
               onClick={handleSave}
             >
-              {saveMutation.isPending ? <Spinner /> : 'Save doc'}
+              {saveMutation.isPending ? <Spinner /> : "Save doc"}
             </button>
           )}
           {!readOnly && (
@@ -428,7 +494,7 @@ function DocEditor({
         </div>
       </div>
 
-      {/* Title field */}
+      {}
       <input
         className="input"
         value={title}
@@ -442,29 +508,31 @@ function DocEditor({
         style={{
           fontSize: 28,
           fontWeight: 700,
-          border: 'none',
-          background: 'transparent',
-          padding: '4px 0',
+          border: "none",
+          background: "transparent",
+          padding: "4px 0",
           marginBottom: 24,
-          boxShadow: 'none',
+          boxShadow: "none",
         }}
       />
 
-      {/* Block Editor */}
+      {}
       <div className="stack" style={{ gap: 12 }}>
         {blocks.map((block, index) => (
           <div
             key={block.id || index}
             className="block-row row"
-            style={{ gap: 8, alignItems: 'flex-start' }}
+            style={{ gap: 8, alignItems: "flex-start" }}
           >
-            {/* Block Type Picker */}
+            {}
             {!readOnly && (
               <select
                 className="select"
-                style={{ width: 100, fontSize: 11, padding: '4px 6px' }}
+                style={{ width: 100, fontSize: 11, padding: "4px 6px" }}
                 value={block.type}
-                onChange={(e) => changeBlockType(index, e.target.value as PageBlock['type'])}
+                onChange={(e) =>
+                  changeBlockType(index, e.target.value as PageBlock["type"])
+                }
               >
                 <option value="paragraph">Text</option>
                 <option value="h1">Heading 1</option>
@@ -477,9 +545,9 @@ function DocEditor({
               </select>
             )}
 
-            {/* Block Content */}
+            {}
             <div className="grow">
-              {block.type === 'h1' ? (
+              {block.type === "h1" ? (
                 <input
                   className="input"
                   value={block.content}
@@ -489,7 +557,7 @@ function DocEditor({
                   placeholder="Heading 1"
                   style={{ fontSize: 22, fontWeight: 700 }}
                 />
-              ) : block.type === 'h2' ? (
+              ) : block.type === "h2" ? (
                 <input
                   className="input"
                   value={block.content}
@@ -499,7 +567,7 @@ function DocEditor({
                   placeholder="Heading 2"
                   style={{ fontSize: 18, fontWeight: 600 }}
                 />
-              ) : block.type === 'h3' ? (
+              ) : block.type === "h3" ? (
                 <input
                   className="input"
                   value={block.content}
@@ -509,7 +577,7 @@ function DocEditor({
                   placeholder="Heading 3"
                   style={{ fontSize: 15, fontWeight: 600 }}
                 />
-              ) : block.type === 'todo' ? (
+              ) : block.type === "todo" ? (
                 <div className="row" style={{ gap: 8 }}>
                   <input
                     type="checkbox"
@@ -524,10 +592,13 @@ function DocEditor({
                     onChange={(e) => updateBlock(index, e.target.value)}
                     onBlur={handleSave}
                     placeholder="To-do item"
-                    style={{ textDecoration: block.checked ? 'line-through' : 'none', opacity: block.checked ? 0.6 : 1 }}
+                    style={{
+                      textDecoration: block.checked ? "line-through" : "none",
+                      opacity: block.checked ? 0.6 : 1,
+                    }}
                   />
                 </div>
-              ) : block.type === 'quote' ? (
+              ) : block.type === "quote" ? (
                 <textarea
                   className="textarea"
                   value={block.content}
@@ -535,9 +606,13 @@ function DocEditor({
                   onChange={(e) => updateBlock(index, e.target.value)}
                   onBlur={handleSave}
                   placeholder="Quote..."
-                  style={{ borderLeft: '3px solid var(--accent)', fontStyle: 'italic', minHeight: 60 }}
+                  style={{
+                    borderLeft: "3px solid var(--accent)",
+                    fontStyle: "italic",
+                    minHeight: 60,
+                  }}
                 />
-              ) : block.type === 'code' ? (
+              ) : block.type === "code" ? (
                 <textarea
                   className="textarea"
                   value={block.content}
@@ -545,10 +620,21 @@ function DocEditor({
                   onChange={(e) => updateBlock(index, e.target.value)}
                   onBlur={handleSave}
                   placeholder="Code block..."
-                  style={{ fontFamily: 'monospace', fontSize: 13, minHeight: 80, background: 'var(--surface-muted)' }}
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: 13,
+                    minHeight: 80,
+                    background: "var(--surface-muted)",
+                  }}
                 />
-              ) : block.type === 'divider' ? (
-                <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '12px 0' }} />
+              ) : block.type === "divider" ? (
+                <hr
+                  style={{
+                    border: "none",
+                    borderTop: "1px solid var(--border)",
+                    margin: "12px 0",
+                  }}
+                />
               ) : (
                 <textarea
                   className="textarea"
@@ -562,7 +648,7 @@ function DocEditor({
               )}
             </div>
 
-            {/* Actions */}
+            {}
             {!readOnly && (
               <div className="row" style={{ gap: 4 }}>
                 <button
@@ -598,7 +684,7 @@ function DocEditor({
         </button>
       )}
 
-      {/* Confirm delete dialog */}
+      {}
       {confirmDelete && (
         <ConfirmDialog
           title="Delete document?"
@@ -614,23 +700,30 @@ function DocEditor({
   );
 }
 
-function VersionHistoryModal({ pageId, onClose }: { pageId: string; onClose: () => void }) {
+function VersionHistoryModal({
+  pageId,
+  onClose,
+}: {
+  pageId: string;
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
   const toast = useToast();
 
   const versionsQuery = useQuery({
-    queryKey: ['page-versions', pageId],
+    queryKey: ["page-versions", pageId],
     queryFn: () => pagesApi.versions(pageId),
   });
 
   const restoreMutation = useMutation({
-    mutationFn: (versionId: string) => pagesApi.restoreVersion(pageId, versionId),
+    mutationFn: (versionId: string) =>
+      pagesApi.restoreVersion(pageId, versionId),
     onSuccess: (res) => {
-      toast.success('Version restored');
-      queryClient.setQueryData(['page', pageId], res);
+      toast.success("Version restored");
+      queryClient.setQueryData(["page", pageId], res);
       onClose();
     },
-    onError: (err: Error) => toast.error('Restore failed', err.message),
+    onError: (err: Error) => toast.error("Restore failed", err.message),
   });
 
   const versions = versionsQuery.data?.versions ?? [];
@@ -638,15 +731,20 @@ function VersionHistoryModal({ pageId, onClose }: { pageId: string; onClose: () 
   return (
     <Modal title="Version History" onClose={onClose} wide={false}>
       {versionsQuery.isLoading && <Spinner />}
-      <div className="stack" style={{ gap: 8, maxHeight: 380, overflowY: 'auto' }}>
+      <div
+        className="stack"
+        style={{ gap: 8, maxHeight: 380, overflowY: "auto" }}
+      >
         {versions.map((v: PageVersion) => (
           <div
             key={v.id || v._id}
             className="row row--between panel"
-            style={{ padding: '10px 14px' }}
+            style={{ padding: "10px 14px" }}
           >
             <div>
-              <div style={{ fontWeight: 600 }}>v{v.version} — {v.title}</div>
+              <div style={{ fontWeight: 600 }}>
+                v{v.version} — {v.title}
+              </div>
               <div className="faint" style={{ fontSize: 12 }}>
                 {new Date(v.createdAt).toLocaleString()} · {v.snapshotReason}
               </div>

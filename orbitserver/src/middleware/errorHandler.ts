@@ -1,12 +1,3 @@
-/**
- * Central error handling (BUILD_PROMPT Phase 2, rule 21):
- *  - ApiError → its catalogue status/code, details allowed
- *  - Mongoose ValidationError/CastError → 422/400 without leaking schema
- *  - duplicate key (E11000) → 409 DUPLICATE_RESOURCE
- *  - payload too large → 413
- *  - unknown → 500 INTERNAL_ERROR, logged with stack, never leaked
- * Every error response carries the requestId from the ALS context.
- */
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import mongoose from 'mongoose';
 import { ErrorCodes } from '@orbit/shared';
@@ -45,7 +36,6 @@ function toApiError(err: unknown): ApiError {
     });
   }
 
-  // Database connectivity / network / server selection errors fail fast with 503 DEPENDENCY_UNAVAILABLE
   if (err && typeof err === 'object') {
     const errorObj = err as { name?: string; message?: string };
     const name = errorObj.name ?? '';
@@ -121,7 +111,6 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   else logger.warn(logPayload, 'request rejected');
 
   if (res.headersSent) {
-    // Nothing we can do except close the connection cleanly.
     res.end();
     return;
   }

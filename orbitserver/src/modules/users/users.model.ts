@@ -1,10 +1,3 @@
-/**
- * User model (BUILD_PROMPT Phase 3).
- *  - email: unique + lowercased, partial index (deleted users free the email)
- *  - passwordHash: select:false — only auth flows may hydrate it
- *  - tokenVersion: bumping it invalidates every issued access token
- *  - lockout fields power the login brute-force defence
- */
 import { Schema, model, type Model, type Types } from 'mongoose';
 import {
   softDeletePlugin,
@@ -19,7 +12,7 @@ export interface IUserPreferences {
   theme: 'light' | 'dark' | 'system';
   emailNotifications: boolean;
   pushNotifications: boolean;
-  quietHoursStart?: string; // 'HH:mm' in the user's timezone
+  quietHoursStart?: string;
   quietHoursEnd?: string;
 }
 
@@ -96,26 +89,20 @@ const userSchema = new Schema<IUser>(
   },
 );
 
-// Unique email among non-deleted users (partial index keeps the hot path small).
 userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
 userSchema.index({ handle: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
-// Unified search over people (Phase 11 uses this for suggestions/mentions).
+
 userSchema.index({ name: 'text', email: 'text', handle: 'text' });
 
 softDeletePlugin(userSchema);
 
-export const UserModel = model<
-  IUser,
-  Model<IUser, SoftDeleteQueryHelpers> & SoftDeleteStatics
->(
+export const UserModel = model<IUser, Model<IUser, SoftDeleteQueryHelpers> & SoftDeleteStatics>(
   'User',
   userSchema,
 );
 
-/** A stored user document — repositories always return this shape. */
 export type UserDoc = IUser & { _id: Types.ObjectId };
 
-/** Public projection — everything a client may ever see about a user. */
 export function toPublicUser(user: UserDoc): Record<string, unknown> {
   return {
     id: String(user._id),

@@ -1,10 +1,13 @@
-/**
- * Minimal toast system — no dependency, just a context + a portal-free fixed
- * stack. API errors surface here so a failed mutation is never silent.
- */
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
-type ToastKind = 'success' | 'error' | 'info';
+type ToastKind = "success" | "error" | "info";
 
 interface Toast {
   id: number;
@@ -24,7 +27,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function useToast(): ToastContextValue {
   const value = useContext(ToastContext);
-  if (!value) throw new Error('useToast must be used inside <ToastProvider>');
+  if (!value) throw new Error("useToast must be used inside <ToastProvider>");
   return value;
 }
 
@@ -38,8 +41,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback(
     (kind: ToastKind, title: string, detail?: string) => {
       const id = Date.now() + Math.random();
-      setToasts((current) => [...current.slice(-3), { id, kind, title, detail }]);
-      window.setTimeout(() => dismiss(id), kind === 'error' ? 7000 : 4000);
+      setToasts((current) => [
+        ...current.slice(-3),
+        { id, kind, title, detail },
+      ]);
+      window.setTimeout(() => dismiss(id), kind === "error" ? 7000 : 4000);
     },
     [dismiss],
   );
@@ -47,9 +53,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ToastContextValue>(
     () => ({
       push,
-      success: (title, detail) => push('success', title, detail),
-      error: (title, detail) => push('error', title, detail),
-      info: (title, detail) => push('info', title, detail),
+      success: (title, detail) => push("success", title, detail),
+      error: (title, detail) => push("error", title, detail),
+      info: (title, detail) => push("info", title, detail),
     }),
     [push],
   );
@@ -64,7 +70,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <strong>{toast.title}</strong>
               {toast.detail ? <span>{toast.detail}</span> : null}
             </div>
-            <button type="button" className="toast__close" onClick={() => dismiss(toast.id)} aria-label="Dismiss">
+            <button
+              type="button"
+              className="toast__close"
+              onClick={() => dismiss(toast.id)}
+              aria-label="Dismiss"
+            >
               ×
             </button>
           </div>

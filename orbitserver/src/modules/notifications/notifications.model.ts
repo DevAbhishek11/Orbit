@@ -1,6 +1,3 @@
-/**
- * Notifications model (BUILD_PROMPT Phase 11).
- */
 import mongoose, { type Document, Schema } from 'mongoose';
 
 export interface NotificationDoc extends Document {
@@ -29,7 +26,11 @@ const NotificationSchema = new Schema<NotificationDoc>(
     title: { type: String, required: true },
     body: { type: String, default: '' },
     link: { type: String, default: null },
-    entityType: { type: String, enum: ['card', 'page', 'channel', 'workspace', null], default: null },
+    entityType: {
+      type: String,
+      enum: ['card', 'page', 'channel', 'workspace', null],
+      default: null,
+    },
     entityId: { type: String, default: null },
     groupKey: { type: String, default: null },
     groupCount: { type: Number, default: 1 },
@@ -41,4 +42,7 @@ const NotificationSchema = new Schema<NotificationDoc>(
 NotificationSchema.index({ userId: 1, readAt: 1, createdAt: -1 });
 NotificationSchema.index({ userId: 1, groupKey: 1, createdAt: -1 });
 
-export const NotificationModel = mongoose.model<NotificationDoc>('Notification', NotificationSchema);
+export const NotificationModel = mongoose.model<NotificationDoc>(
+  'Notification',
+  NotificationSchema,
+);

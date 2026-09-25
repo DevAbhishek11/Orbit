@@ -1,7 +1,3 @@
-/**
- * Workspace membership (BUILD_PROMPT Phase 5) — the RBAC join table.
- * Unique {workspaceId, userId}: one membership row per user per workspace.
- */
 import { Schema, model } from 'mongoose';
 import type { Role } from '@orbit/shared';
 
@@ -45,7 +41,7 @@ const memberSchema = new Schema<IWorkspaceMember>(
 );
 
 memberSchema.index({ workspaceId: 1, userId: 1 }, { unique: true });
-memberSchema.index({ userId: 1, status: 1 }); // "my workspaces" hot path
-memberSchema.index({ workspaceId: 1, role: 1 }); // last-owner protection checks
+memberSchema.index({ userId: 1, status: 1 });
+memberSchema.index({ workspaceId: 1, role: 1 });
 
 export const WorkspaceMemberModel = model<IWorkspaceMember>('WorkspaceMember', memberSchema);

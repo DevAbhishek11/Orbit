@@ -1,8 +1,3 @@
-/**
- * Response envelope helpers — the ONLY way routes answer (BUILD_PROMPT §4).
- *   success: { success: true, data, meta: { requestId, nextCursor?, cached? } }
- *   error:   { success: false, error: { code, message, details?, requestId } }
- */
 import type { Response } from 'express';
 import type { ResponseMeta } from '@orbit/shared';
 import { getRequestContext } from '../logger/requestContext.js';

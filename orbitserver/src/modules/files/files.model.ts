@@ -1,7 +1,3 @@
-/**
- * Files model (BUILD_PROMPT Phase 11):
- * S3/MinIO presigned upload flow with magic-byte validation.
- */
 import mongoose, { type Document, Schema } from 'mongoose';
 
 export interface FileDoc extends Document {

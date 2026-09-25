@@ -1,7 +1,5 @@
-/* ══════════════════════════════════════════════════════════════════════════
-   Orbit — design tokens + component styles
-   Dark by default; `data-theme="light"` on <html> flips the palette.
-   ══════════════════════════════════════════════════════════════════════════ */
+@import './portal.css';
+
 
 :root {
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -143,7 +141,7 @@ code {
   background: var(--accent-soft);
 }
 
-/* ── Scrollbars ─────────────────────────────────────────────────────────── */
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
@@ -159,7 +157,7 @@ code {
   background-clip: content-box;
 }
 
-/* ── Layout ─────────────────────────────────────────────────────────────── */
+
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
@@ -332,7 +330,7 @@ code {
   font-size: 13px;
 }
 
-/* ── Buttons ────────────────────────────────────────────────────────────── */
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -398,7 +396,7 @@ code {
   width: 100%;
 }
 
-/* ── Forms ──────────────────────────────────────────────────────────────── */
+
 .field {
   display: flex;
   flex-direction: column;
@@ -467,7 +465,7 @@ code {
   height: 15px;
 }
 
-/* ── Cards / panels ─────────────────────────────────────────────────────── */
+
 .panel {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -490,7 +488,7 @@ code {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
-/* ── Board tile ─────────────────────────────────────────────────────────── */
+
 .board-tile {
   display: flex;
   flex-direction: column;
@@ -525,7 +523,7 @@ code {
   font-size: 12.5px;
 }
 
-/* ── Badges / chips ─────────────────────────────────────────────────────── */
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -564,7 +562,7 @@ code {
   color: #fff;
 }
 
-/* ── Avatars ────────────────────────────────────────────────────────────── */
+
 .avatar {
   width: 26px;
   height: 26px;
@@ -596,7 +594,7 @@ code {
   box-shadow: 0 0 0 2px var(--surface);
 }
 
-/* ── Kanban ─────────────────────────────────────────────────────────────── */
+
 .kanban {
   display: flex;
   gap: var(--space-4);
@@ -719,7 +717,7 @@ code {
   margin: 2px 0;
 }
 
-/* ── Modal ──────────────────────────────────────────────────────────────── */
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -785,7 +783,7 @@ code {
   }
 }
 
-/* ── Card detail ────────────────────────────────────────────────────────── */
+
 .detail-grid {
   display: grid;
   grid-template-columns: 1fr 216px;
@@ -880,7 +878,7 @@ code {
   transition: width 0.2s var(--ease);
 }
 
-/* ── Table ──────────────────────────────────────────────────────────────── */
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -907,7 +905,7 @@ code {
   background: var(--surface-hover);
 }
 
-/* ── Auth pages ─────────────────────────────────────────────────────────── */
+
 .auth-page {
   min-height: 100%;
   display: grid;
@@ -953,7 +951,7 @@ code {
   text-align: center;
 }
 
-/* ── States ─────────────────────────────────────────────────────────────── */
+
 .empty {
   text-align: center;
   padding: var(--space-7) var(--space-4);
@@ -1041,7 +1039,7 @@ code {
   flex: 1;
 }
 
-/* ── Toasts ─────────────────────────────────────────────────────────────── */
+
 .toast-stack {
   position: fixed;
   right: var(--space-4);
@@ -1099,7 +1097,7 @@ code {
   }
 }
 
-/* ── Responsive ─────────────────────────────────────────────────────────── */
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1109,7 +1107,7 @@ code {
   }
 }
 
-/* Workspace experience refresh */
+
 :root { --accent: #8b7cf8; --accent-hover: #a497ff; --accent-soft: rgba(139,124,248,.12); --sidebar-width: 244px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 button, input, select, textarea { font-family: inherit; }

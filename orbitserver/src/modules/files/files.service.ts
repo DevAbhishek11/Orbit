@@ -1,7 +1,5 @@
-/**
- * Files service (BUILD_PROMPT Phase 11):
- * Presigned upload flow with magic-byte validation and S3 stub.
- */
+import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import { notFound, validationFailed } from '../../infrastructure/errors/ApiError.js';
 import { enqueue } from '../../infrastructure/queues/index.js';
@@ -9,6 +7,12 @@ import { emitSafe } from '../../infrastructure/events/eventBus.js';
 import * as repo from './files.repository.js';
 import type { FileDoc } from './files.model.js';
 import type { PresignInput } from './files.schema.js';
+
+const LOCAL_STORAGE_DIR = path.resolve(process.cwd(), 'uploads');
+
+if (!fs.existsSync(LOCAL_STORAGE_DIR)) {
+  fs.mkdirSync(LOCAL_STORAGE_DIR, { recursive: true });
+}
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
@@ -37,12 +41,12 @@ export async function presignUpload(
   input: PresignInput,
   actorId: string,
 ): Promise<{ file: FileDoc; uploadUrl: string; s3Key: string }> {
-  // Validate MIME type
   if (!ALLOWED_MIME_TYPES.has(input.mimeType)) {
-    throw validationFailed([{ path: 'mimeType', message: `MIME type ${input.mimeType} not allowed` }]);
+    throw validationFailed([
+      { path: 'mimeType', message: `MIME type ${input.mimeType} not allowed` },
+    ]);
   }
 
-  // Validate file extension matches mime (basic check)
   const ext = input.fileName.split('.').pop()?.toLowerCase() ?? '';
   if (ext === 'exe' || ext === 'bat' || ext === 'sh' || ext === 'js') {
     throw validationFailed([{ path: 'fileName', message: 'Executable files are not allowed' }]);
@@ -69,6 +73,66 @@ export async function presignUpload(
   return { file, uploadUrl: finalUploadUrl, s3Key };
 }
 
+export async function saveLocalFileStream(
+  workspaceId: string,
+  fileId: string,
+  readable: NodeJS.ReadableStream,
+): Promise<FileDoc> {
+  const file = await repo.findFileByIdScoped(fileId, workspaceId);
+  if (!file) throw notFound('File');
+
+  const targetDir = path.join(LOCAL_STORAGE_DIR, workspaceId);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const safeFileName = `${file._id.toString()}-${path.basename(file.originalName)}`;
+  const destinationPath = path.join(targetDir, safeFileName);
+  const writeStream = fs.createWriteStream(destinationPath);
+
+  await new Promise<void>((resolve, reject) => {
+    readable.pipe(writeStream);
+    writeStream.on('finish', () => resolve());
+    writeStream.on('error', (err) => reject(err));
+  });
+
+  const updated = await repo.updateFileById(fileId, {
+    status: 'ready',
+  });
+
+  if (!updated) throw notFound('File');
+
+  if (updated.mimeType.startsWith('image/')) {
+    void enqueue('files', 'process-upload', {
+      fileId: updated._id.toString(),
+      workspaceId,
+      mimeType: updated.mimeType,
+    });
+  }
+
+  emitSafe(`workspace:${workspaceId}`, 'file:ready', {
+    fileId: updated._id.toString(),
+    fileName: updated.originalName,
+    mimeType: updated.mimeType,
+  });
+
+  return updated;
+}
+
+export async function getLocalFilePath(
+  workspaceId: string,
+  fileId: string,
+): Promise<{ filePath: string; file: FileDoc }> {
+  const file = await repo.findFileByIdScoped(fileId, workspaceId);
+  if (!file || file.status === 'deleted') throw notFound('File');
+
+  const targetDir = path.join(LOCAL_STORAGE_DIR, workspaceId);
+  const safeFileName = `${file._id.toString()}-${path.basename(file.originalName)}`;
+  const filePath = path.join(targetDir, safeFileName);
+
+  return { filePath, file };
+}
+
 export async function confirmUpload(
   fileId: string,
   workspaceId: string,
@@ -79,9 +143,6 @@ export async function confirmUpload(
 
   if (file.status === 'ready') return file;
 
-  // In production: verify magic bytes by fetching S3 object header
-  // For now, we trust the upload and mark ready
-
   const updated = await repo.updateFileById(fileId, {
     status: 'ready',
     checksum: checksum ?? null,
@@ -89,7 +150,6 @@ export async function confirmUpload(
 
   if (!updated) throw notFound('File');
 
-  // Enqueue thumbnail generation for images
   if (updated.mimeType.startsWith('image/')) {
     void enqueue('files', 'process-upload', {
       fileId: updated._id.toString(),
@@ -98,7 +158,6 @@ export async function confirmUpload(
     });
   }
 
-  // Emit file:ready event
   emitSafe(`workspace:${workspaceId}`, 'file:ready', {
     fileId: updated._id.toString(),
     fileName: updated.originalName,
@@ -120,7 +179,17 @@ export async function deleteFile(fileId: string, workspaceId: string): Promise<v
 
   await repo.deleteFileById(fileId);
 
-  // Enqueue cleanup job
+  try {
+    const targetDir = path.join(LOCAL_STORAGE_DIR, workspaceId);
+    const safeFileName = `${file._id.toString()}-${path.basename(file.originalName)}`;
+    const destinationPath = path.join(targetDir, safeFileName);
+    if (fs.existsSync(destinationPath)) {
+      await fs.promises.unlink(destinationPath).catch(() => undefined);
+    }
+  } catch (_err) {
+    void _err;
+  }
+
   void enqueue('cleanup', 'purge-orphan-file', {
     fileId,
     workspaceId,

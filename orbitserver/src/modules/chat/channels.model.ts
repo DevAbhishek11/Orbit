@@ -1,7 +1,3 @@
-/**
- * Channels model (BUILD_PROMPT Phase 8 — Slack pillar):
- * Public, private and DM channels with denormalized lastMessage & counters.
- */
 import mongoose, { type Document, Schema } from 'mongoose';
 import { softDeletePlugin } from '../../plugins/softDelete.js';
 

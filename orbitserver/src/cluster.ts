@@ -1,17 +1,3 @@
-/**
- * Clustered server runtime (PROJECT_PLAN §6.5 & BUILD_PROMPT Phase 2):
- *
- * Primary process:
- *  - forks WEB_CONCURRENCY workers (defaults to os.availableParallelism() in prod, 1 in dev)
- *  - staggers startup (750 ms) so DB/Redis pools warm up gently
- *  - monitors worker liveness & auto-restarts crashed workers with exponential backoff
- *  - detects crash loops (>10 rapid crashes in 60 s) and exits so orchestrator intervenes
- *  - zero-downtime rolling reload on SIGUSR2 (drains one worker, forks new, staggers)
- *  - orchestrated graceful shutdown on SIGTERM / SIGINT
- *
- * Worker process:
- *  - loads and executes server.ts
- */
 import cluster from 'node:cluster';
 import os from 'node:os';
 import process from 'node:process';
@@ -46,7 +32,11 @@ if (cluster.isPrimary) {
     worker.on('message', (msg: unknown) => {
       if (typeof msg === 'object' && msg !== null && (msg as { type?: string }).type === 'ready') {
         logger.info(
-          { workerPid: worker.process.pid, workerId: worker.id, bootElapsedMs: Date.now() - bootTime },
+          {
+            workerPid: worker.process.pid,
+            workerId: worker.id,
+            bootElapsedMs: Date.now() - bootTime,
+          },
           'cluster worker ready to accept requests',
         );
       }
@@ -55,12 +45,10 @@ if (cluster.isPrimary) {
     return worker;
   };
 
-  // 1) Fork workers with staggered start
   for (let i = 0; i < workerCount; i++) {
     setTimeout(() => fork(i), i * 750);
   }
 
-  // 2) Crash resilience: auto-restart with exponential backoff & crash-loop detection
   const crashes = new Map<number, { count: number; lastAt: number }>();
   cluster.on('exit', (worker, code, signal) => {
     if (shuttingDown) return;
@@ -99,7 +87,6 @@ if (cluster.isPrimary) {
     }, delayMs);
   });
 
-  // 3) Zero-downtime rolling reload on SIGUSR2
   async function rollingReload(): Promise<void> {
     if (shuttingDown) return;
     logger.info('cluster primary: starting zero-downtime rolling reload (SIGUSR2)');
@@ -113,9 +100,7 @@ if (cluster.isPrimary) {
         const killTimer = setTimeout(() => {
           try {
             w.process.kill('SIGKILL');
-          } catch {
-            // Already dead
-          }
+          } catch {}
           resolve();
         }, SHUTDOWN_GRACE_MS);
         killTimer.unref();
@@ -140,7 +125,6 @@ if (cluster.isPrimary) {
 
   process.on('SIGUSR2', () => void rollingReload());
 
-  // 4) Orchestrated shutdown (SIGTERM / SIGINT)
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
@@ -154,9 +138,7 @@ if (cluster.isPrimary) {
             const killTimer = setTimeout(() => {
               try {
                 w?.kill('SIGKILL');
-              } catch {
-                // Ignore
-              }
+              } catch {}
               resolve();
             }, SHUTDOWN_GRACE_MS);
             killTimer.unref();
@@ -182,6 +164,5 @@ if (cluster.isPrimary) {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
 } else {
-  // Cluster worker: launch the HTTP server
   await import('./server.js');
 }

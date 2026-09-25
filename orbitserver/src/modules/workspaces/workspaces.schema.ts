@@ -1,9 +1,5 @@
-/**
- * Workspace endpoint contracts (Zod — single source of truth).
- */
 import { z } from 'zod';
 
-/** Roles an owner/admin can grant (ownership moves only via transfer). */
 const INVITABLE_ROLES = ['admin', 'manager', 'member', 'viewer'] as const;
 
 export const objectId = z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid id');
@@ -58,7 +54,7 @@ export const updateMemberSchema = z
 
 export const transferOwnershipSchema = z.object({
   toUserId: objectId,
-  confirm: z.string().min(1), // must equal the workspace slug (typed confirmation)
+  confirm: z.string().min(1),
 });
 
 export const deleteWorkspaceSchema = z.object({

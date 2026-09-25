@@ -1,8 +1,3 @@
-/**
- * Boards & lists routes (BUILD_PROMPT Phase 6).
- * Item routes derive the tenant from the resource via authorize({load}) —
- * foreign or invisible resources answer 404.
- */
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/authenticate.js';
@@ -28,7 +23,6 @@ export const boardsRouter = Router();
 
 const writeLimit = rateLimit({ tier: 'write' });
 
-/** Scope loader: board by id, tenant-agnostic (the guard checks membership). */
 async function loadBoard(req: Request): Promise<ScopeDescriptor | null> {
   const auth = req.auth!;
   const board =
@@ -43,7 +37,6 @@ async function loadBoard(req: Request): Promise<ScopeDescriptor | null> {
   };
 }
 
-/** Scope loader: list by id → its board's descriptor. */
 async function loadList(req: Request): Promise<ScopeDescriptor | null> {
   const list = await findListById(String(req.params.id));
   if (!list) return null;
@@ -51,7 +44,6 @@ async function loadList(req: Request): Promise<ScopeDescriptor | null> {
   return loadBoard(fakeReq);
 }
 
-// ── Workspace-scoped board collection ─────────────────────────────────
 boardsRouter.post(
   '/workspaces/:wid/boards',
   authenticate(),
@@ -72,7 +64,6 @@ boardsRouter.get(
   controller.listBoards,
 );
 
-// ── Board item ────────────────────────────────────────────────────────
 boardsRouter.get(
   '/boards/:id',
   authenticate(),
@@ -96,7 +87,6 @@ boardsRouter.delete(
   controller.deleteBoard,
 );
 
-// ── Lists ─────────────────────────────────────────────────────────────
 boardsRouter.post(
   '/boards/:id/lists',
   authenticate(),
@@ -106,15 +96,19 @@ boardsRouter.post(
   authorize('list:create', { load: loadBoard }),
   controller.createList,
 );
-// NOTE: this static path MUST be registered before '/lists/:id' — Express 5
-// matches in registration order, so '/lists/reorder' declared afterwards would
-// be swallowed by the ':id' route and rejected by its objectId validation (422).
+
 boardsRouter.patch(
   '/lists/reorder',
   authenticate(),
   writeLimit,
   validate({ body: reorderListsSchema }),
-  authorize('list:reorder', { load: (req) => loadBoard({ ...req, params: { id: (req.body as { boardId: string }).boardId } } as unknown as Request) }),
+  authorize('list:reorder', {
+    load: (req) =>
+      loadBoard({
+        ...req,
+        params: { id: (req.body as { boardId: string }).boardId },
+      } as unknown as Request),
+  }),
   controller.reorderLists,
 );
 boardsRouter.patch(

@@ -1,6 +1,3 @@
-/**
- * Comments repository — unified collection across card/page/message.
- */
 import type { ClientSession, Types } from 'mongoose';
 import { clampLimit } from '@orbit/shared';
 import { CommentModel, type IComment } from './comments.model.js';
@@ -38,9 +35,8 @@ export async function softDeleteComment(
 ): Promise<boolean> {
   const filter: Record<string, unknown> = { _id: commentId };
   if (!privileged) filter.authorId = authorId;
-  const result = await CommentModel.findOneAndUpdate(
-    filter,
-    { $set: { deletedAt: new Date(), deletedBy: authorId } },
-  ).exec();
+  const result = await CommentModel.findOneAndUpdate(filter, {
+    $set: { deletedAt: new Date(), deletedBy: authorId },
+  }).exec();
   return result !== null;
 }

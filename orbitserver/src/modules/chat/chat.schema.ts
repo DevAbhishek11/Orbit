@@ -1,6 +1,3 @@
-/**
- * Zod validation schemas for Chat module.
- */
 import { z } from 'zod';
 import { CONTENT } from '@orbit/shared';
 

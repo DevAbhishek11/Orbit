@@ -1,9 +1,3 @@
-/**
- * Soft-delete plugin (BUILD_PROMPT rule 8): adds `deletedAt`/`deletedBy`,
- * filters deleted documents from every query by default, and exposes
- * restore()/purge() statics plus `.deleted()`/`.withDeleted()` query helpers.
- * A 30-day purge job (Phase 10) hard-deletes expired trash.
- */
 import type { Aggregate, HydratedDocument, Model, Query, Schema } from 'mongoose';
 
 export interface SoftDeleteFields {
@@ -53,7 +47,6 @@ export function softDeletePlugin(schema: Schema): void {
   });
   schema.index({ deletedAt: 1, updatedAt: -1 });
 
-  // Default scope: hide soft-deleted documents unless the caller opts in.
   for (const hook of QUERY_HOOKS) {
     schema.pre(hook as 'find', function injectScope(this: AnyQuery) {
       if (shouldSkipFiltering(this)) return;
@@ -69,7 +62,6 @@ export function softDeletePlugin(schema: Schema): void {
     pipeline.unshift({ $match: { deletedAt: null } });
   });
 
-  // Escape hatches: trash views and the purge job.
   const queryHelpers = schema.query as unknown as SoftDeleteQueryHelpers;
   queryHelpers.deleted = function deleted(this: AnyQuery) {
     const filter = this.getFilter() as Record<string, unknown>;
@@ -82,8 +74,6 @@ export function softDeletePlugin(schema: Schema): void {
     return this;
   };
 
-  // Statics target deleted docs explicitly (the pre-hook skips injection when
-  // the caller's filter already mentions deletedAt).
   schema.statics.restore = function restore(
     this: Model<SoftDeleteFields>,
     filter: Record<string, unknown>,

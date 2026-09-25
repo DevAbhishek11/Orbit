@@ -1,6 +1,3 @@
-/**
- * Pages routes (BUILD_PROMPT Phase 7).
- */
 import { Router, type Request } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import { authorize, type ScopeDescriptor } from '../../middleware/authorize.js';
@@ -35,7 +32,6 @@ async function loadPage(req: Request): Promise<ScopeDescriptor | null> {
   };
 }
 
-// Workspace collection routes
 pagesRouter.post(
   '/workspaces/:wid/pages',
   authenticate(),
@@ -54,7 +50,6 @@ pagesRouter.get(
   controller.getPageTree,
 );
 
-// Individual page routes
 pagesRouter.get(
   '/pages/:id',
   authenticate(),

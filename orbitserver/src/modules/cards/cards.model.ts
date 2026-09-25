@@ -1,10 +1,3 @@
-/**
- * Card model (BUILD_PROMPT Phase 6) — the Kanban work item.
- *  - `order`: fractional key inside its list (O(1) drag & drop)
- *  - `version`: optimistic concurrency; stale writes get 409 + current doc
- *  - labels/checklists/attachments are EMBEDDED and bounded (read with card)
- *  - commentCount/checklistProgress are denormalized inside transactions
- */
 import { Schema, model, type Model } from 'mongoose';
 import { CONTENT } from '@orbit/shared';
 import {
@@ -17,7 +10,7 @@ import {
 export type CardPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
 
 export interface ICardLabel {
-  id: string; // short stable id (nanoid) within the board
+  id: string;
   name: string;
   color: string;
 }
@@ -48,7 +41,7 @@ export interface ICard extends SoftDeleteFields {
   boardId: string;
   listId: string;
   title: string;
-  description?: string; // sanitized rich text (Phase 7 sanitizer)
+  description?: string;
   order: string;
   labels: ICardLabel[];
   checklists: IChecklist[];
@@ -64,8 +57,8 @@ export interface ICard extends SoftDeleteFields {
   attachmentCount: number;
   checklistProgress: { done: number; total: number };
   watcherIds: string[];
-  sourceMessageId?: string | null; // C1: created from a chat message
-  pageId?: string | null; // card ↔ doc page link
+  sourceMessageId?: string | null;
+  pageId?: string | null;
   version: number;
   createdBy: string;
   archivedAt: Date | null;
@@ -164,31 +157,26 @@ const cardSchema = new Schema<ICard>(
   { collection: 'cards', timestamps: true },
 );
 
-// ── Mandatory indexes (Phase 6 item 2 — each proven by IXSCAN tests) ──
-cardSchema.index({ listId: 1, order: 1 }); // board render / drag & drop
-cardSchema.index({ boardId: 1, archivedAt: 1, dueAt: 1 }); // board filters
-cardSchema.index({ workspaceId: 1, assignees: 1, completedAt: 1 }); // "my cards"
-cardSchema.index(
-  { dueAt: 1 },
-  { partialFilterExpression: { completedAt: null, deletedAt: null } }, // reminders
-);
-cardSchema.index({ sourceMessageId: 1 }, { sparse: true }); // message→card link
-cardSchema.index({ pageId: 1 }, { sparse: true }); // card↔page link
-cardSchema.index({ title: 'text', description: 'text' }); // unified search
-cardSchema.index({ workspaceId: 1, updatedAt: -1 }); // activity feeds / sync
+cardSchema.index({ listId: 1, order: 1 });
+cardSchema.index({ boardId: 1, archivedAt: 1, dueAt: 1 });
+cardSchema.index({ workspaceId: 1, assignees: 1, completedAt: 1 });
+cardSchema.index({ dueAt: 1 }, { partialFilterExpression: { completedAt: null, deletedAt: null } });
+cardSchema.index({ sourceMessageId: 1 }, { sparse: true });
+cardSchema.index({ pageId: 1 }, { sparse: true });
+cardSchema.index({ title: 'text', description: 'text' });
+cardSchema.index({ workspaceId: 1, updatedAt: -1 });
 
 softDeletePlugin(cardSchema);
 
-export const CardModel = model<
-  ICard,
-  Model<ICard, SoftDeleteQueryHelpers> & SoftDeleteStatics
->(
+export const CardModel = model<ICard, Model<ICard, SoftDeleteQueryHelpers> & SoftDeleteStatics>(
   'Card',
   cardSchema,
 );
 
-/** Recompute the embedded checklist progress counters. */
-export function computeChecklistProgress(card: Pick<ICard, 'checklists'>): { done: number; total: number } {
+export function computeChecklistProgress(card: Pick<ICard, 'checklists'>): {
+  done: number;
+  total: number;
+} {
   let done = 0;
   let total = 0;
   for (const checklist of card.checklists) {

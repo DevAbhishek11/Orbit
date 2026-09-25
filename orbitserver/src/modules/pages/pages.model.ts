@@ -1,8 +1,3 @@
-/**
- * Pages model (BUILD_PROMPT Phase 7 — Notion pillar):
- * Materialized path hierarchy (ancestors + depth), fractional order,
- * block content, version counter for autosave conflict detection.
- */
 import mongoose, { type Document, Schema } from 'mongoose';
 import { CONTENT } from '@orbit/shared';
 import { softDeletePlugin } from '../../plugins/softDelete.js';

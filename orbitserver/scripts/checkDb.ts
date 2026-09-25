@@ -1,22 +1,17 @@
-/**
- * Database connectivity probe — answers "is my MONGODB_URI actually usable?"
- * without starting the API.
- *
- *   npm run check-db
- *
- * Reports the resolved host, the topology, the server version, whether
- * multi-document TRANSACTIONS work on this deployment (Atlas M0 has
- * historically rejected them), the existing collections and their document
- * counts, and finally proves a real write + delete round trip.
- */
 import mongoose from 'mongoose';
 import { env } from '../src/config/env.js';
 import { logger } from '../src/infrastructure/logger/index.js';
-import { connectDatabase, disconnectDatabase, getDbRuntimeInfo } from '../src/infrastructure/db/mongoose.js';
+import {
+  connectDatabase,
+  disconnectDatabase,
+  getDbRuntimeInfo,
+} from '../src/infrastructure/db/mongoose.js';
 
 async function main(): Promise<void> {
-  // Print the URI with the password masked — this output gets pasted into issues.
-  const masked = env.MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, (_m, user: string) => `//${user}:***@`);
+  const masked = env.MONGODB_URI.replace(
+    /\/\/([^:]+):([^@]+)@/,
+    (_m, user: string) => `//${user}:***@`,
+  );
   logger.info({ uri: masked, dbName: env.MONGO_DB_NAME }, 'connecting');
 
   await connectDatabase();

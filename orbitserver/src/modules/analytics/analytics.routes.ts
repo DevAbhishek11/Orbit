@@ -1,6 +1,3 @@
-/**
- * Analytics routes (BUILD_PROMPT Phase 11 — Aggregations A2 & A7).
- */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { ok } from '../../infrastructure/http/response.js';
@@ -41,7 +38,11 @@ analyticsRouter.get(
     ] = await Promise.all([
       BoardModel.countDocuments({ workspaceId: wid, deletedAt: null }).exec(),
       CardModel.countDocuments({ workspaceId: wid, deletedAt: null }).exec(),
-      CardModel.countDocuments({ workspaceId: wid, deletedAt: null, completedAt: { $ne: null } }).exec(),
+      CardModel.countDocuments({
+        workspaceId: wid,
+        deletedAt: null,
+        completedAt: { $ne: null },
+      }).exec(),
       CardModel.countDocuments({
         workspaceId: wid,
         deletedAt: null,

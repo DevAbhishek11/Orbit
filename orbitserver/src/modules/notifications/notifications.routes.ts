@@ -1,6 +1,3 @@
-/**
- * Notifications routes (BUILD_PROMPT Phase 11).
- */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { ok } from '../../infrastructure/http/response.js';

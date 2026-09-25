@@ -1,4 +1,3 @@
-/** Boot metadata shared by health and metrics. */
 const bootTime = Date.now();
 
 export const startedAt = new Date(bootTime).toISOString();

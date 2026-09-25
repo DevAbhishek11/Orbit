@@ -1,6 +1,3 @@
-/**
- * Channel read state model (BUILD_PROMPT Phase 8).
- */
 import mongoose, { type Document, Schema } from 'mongoose';
 
 export interface ChannelReadDoc extends Document {

@@ -1,17 +1,3 @@
-/**
- * Migration runner (BUILD_PROMPT Phase 6).
- *
- * Usage:
- *   npm run migrate              # run pending migrations
- *   npm run migrate:status       # show applied / pending
- *   npm run migrate:create -- add-field-x
- *
- * Migrations live in orbitserver/migrations/*.ts and export { id, up, down }.
- * State is tracked in collection `migrations` { _id: id, appliedAt }.
- *
- * Each migration must be idempotent — re-running up after a crash must not
- * double-apply. Use transactions when possible (requires replica set).
- */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,7 +23,9 @@ interface MigrationRecord {
 
 async function getMigrationFiles(): Promise<string[]> {
   if (!fs.existsSync(MIGRATIONS_DIR)) return [];
-  const files = fs.readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.ts') || f.endsWith('.js'));
+  const files = fs
+    .readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.ts') || f.endsWith('.js'));
   return files.sort();
 }
 
@@ -108,7 +96,8 @@ export async function down(db: mongoose.Connection): Promise<void> {
     console.log('Applied:');
     for (const id of [...applied].sort()) console.log(`  ✓ ${id}`);
     console.log('\nPending:');
-    for (const m of migrations) if (!applied.has(m.id)) console.log(`  ○ ${m.id} — ${m.description ?? ''}`);
+    for (const m of migrations)
+      if (!applied.has(m.id)) console.log(`  ○ ${m.id} — ${m.description ?? ''}`);
     await mongoose.disconnect();
     process.exit(0);
   }
@@ -140,7 +129,6 @@ export async function down(db: mongoose.Connection): Promise<void> {
     process.exit(0);
   }
 
-  // up
   let ran = 0;
   for (const m of migrations) {
     if (applied.has(m.id)) continue;

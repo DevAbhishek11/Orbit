@@ -1,10 +1,13 @@
-/**
- * Shared UI primitives — small, dependency-free, used across every page.
- */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from "react";
 
 export function Spinner({ large = false }: { large?: boolean }) {
-  return <div className={large ? 'spinner spinner--lg' : 'spinner'} role="progressbar" aria-label="Loading" />;
+  return (
+    <div
+      className={large ? "spinner spinner--lg" : "spinner"}
+      role="progressbar"
+      aria-label="Loading"
+    />
+  );
 }
 
 export function CenterState({ children }: { children: ReactNode }) {
@@ -17,7 +20,7 @@ export function CenterState({ children }: { children: ReactNode }) {
 }
 
 export function EmptyState({
-  icon = '✦',
+  icon = "✦",
   title,
   hint,
   action,
@@ -32,7 +35,7 @@ export function EmptyState({
       <div className="empty__icon">{icon}</div>
       <h3>{title}</h3>
       {hint ? (
-        <p className="faint" style={{ margin: '6px 0 0' }}>
+        <p className="faint" style={{ margin: "6px 0 0" }}>
           {hint}
         </p>
       ) : null}
@@ -41,7 +44,13 @@ export function EmptyState({
   );
 }
 
-export function ErrorBox({ message, requestId }: { message: string; requestId?: string }) {
+export function ErrorBox({
+  message,
+  requestId,
+}: {
+  message: string;
+  requestId?: string;
+}) {
   return (
     <div className="error-box" role="alert">
       <div>{message}</div>
@@ -54,28 +63,39 @@ export function ErrorBox({ message, requestId }: { message: string; requestId?: 
   );
 }
 
-export function Avatar({ name, url, size }: { name: string; url?: string | null; size?: 'sm' | 'lg' }) {
+export function Avatar({
+  name,
+  url,
+  size,
+}: {
+  name: string;
+  url?: string | null;
+  size?: "sm" | "lg";
+}) {
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
   return (
-    <span className={size === 'lg' ? 'avatar avatar--lg' : 'avatar'} title={name}>
-      {url ? <img src={url} alt="" /> : initials || '?'}
+    <span
+      className={size === "lg" ? "avatar avatar--lg" : "avatar"}
+      title={name}
+    >
+      {url ? <img src={url} alt="" /> : initials || "?"}
     </span>
   );
 }
 
 export function Badge({
   children,
-  tone = 'default',
+  tone = "default",
 }: {
   children: ReactNode;
-  tone?: 'default' | 'accent' | 'success' | 'warning' | 'danger';
+  tone?: "default" | "accent" | "success" | "warning" | "danger";
 }) {
-  const suffix = tone === 'default' ? '' : ` badge--${tone}`;
+  const suffix = tone === "default" ? "" : ` badge--${tone}`;
   return <span className={`badge${suffix}`}>{children}</span>;
 }
 
@@ -115,22 +135,34 @@ export function Modal({
 }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === "Escape") onClose();
     };
-    window.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
     };
   }, [onClose]);
 
   return (
-    <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className={wide ? 'modal' : 'modal modal--sm'} role="dialog" aria-modal="true">
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <div
+        className={wide ? "modal" : "modal modal--sm"}
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="modal__head">
           <div className="modal__title">{title}</div>
-          <button type="button" className="btn btn--ghost btn--icon" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="btn btn--ghost btn--icon"
+            onClick={onClose}
+            aria-label="Close"
+          >
             ×
           </button>
         </div>
@@ -144,7 +176,7 @@ export function Modal({
 export function ConfirmDialog({
   title,
   body,
-  confirmLabel = 'Confirm',
+  confirmLabel = "Confirm",
   danger = false,
   requireText,
   onConfirm,
@@ -155,13 +187,13 @@ export function ConfirmDialog({
   body: ReactNode;
   confirmLabel?: string;
   danger?: boolean;
-  /** When set, the user must type this exact string to enable the button. */
+
   requireText?: string;
   onConfirm: (typed: string) => void;
   onClose: () => void;
   busy?: boolean;
 }) {
-  const [typed, setTyped] = useState('');
+  const [typed, setTyped] = useState("");
   const blocked = requireText ? typed !== requireText : false;
 
   return (
@@ -171,12 +203,17 @@ export function ConfirmDialog({
       wide={false}
       footer={
         <>
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+          <button
+            type="button"
+            className="btn"
+            onClick={onClose}
+            disabled={busy}
+          >
             Cancel
           </button>
           <button
             type="button"
-            className={danger ? 'btn btn--danger' : 'btn btn--primary'}
+            className={danger ? "btn btn--danger" : "btn btn--primary"}
             disabled={busy || blocked}
             onClick={() => onConfirm(typed)}
           >

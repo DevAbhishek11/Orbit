@@ -1,13 +1,3 @@
-/**
- * Server bootstrap (BUILD_PROMPT Phase 2):
- *   env → logger → mongo → redis → app → listen(0.0.0.0)
- * Graceful shutdown drains HTTP → Mongo → Redis on SIGTERM/SIGINT with a hard
- * deadline; unhandled rejections/exceptions log fatal and exit non-zero.
- *
- * Resilient boot: if MongoDB is unreachable the server still starts and
- * /health/ready reports 503 (so orchestrators and previews see the truth),
- * unless MONGO_REQUIRE_TRANSACTIONS=true (strict mode → exit).
- */
 import http from 'node:http';
 import { env } from './config/env.js';
 import { logger } from './infrastructure/logger/index.js';
@@ -27,9 +17,15 @@ async function boot(): Promise<void> {
     `starting ${env.APP_NAME} API`,
   );
 
-  // ── MongoDB (Atlas) ──────────────────────────────────────────────
   try {
     await connectDatabase();
+    try {
+      const { ensureInitialData } = await import('./infrastructure/db/seedData.js');
+      await ensureInitialData();
+      logger.info('initial database seed verified');
+    } catch (seedErr) {
+      logger.warn({ err: (seedErr as Error).message }, 'initial database seed skipped or failed');
+    }
   } catch (err) {
     logger.fatal({ err: (err as Error).message }, 'MongoDB unreachable at boot');
     if (env.MONGO_REQUIRE_TRANSACTIONS) {
@@ -39,7 +35,6 @@ async function boot(): Promise<void> {
     logger.warn('continuing in DEGRADED mode — /health/ready will report 503 until Mongo recovers');
   }
 
-  // ── Redis (best-effort: cache/queue degrade gracefully) ──────────
   try {
     const cache = createCacheClient();
     await cache.connect();
@@ -55,21 +50,22 @@ async function boot(): Promise<void> {
     }
   }
 
-  // ── HTTP ──────────────────────────────────────────────────────────
   const app = createApp();
   const server = http.createServer(app);
-  server.headersTimeout = 65_000; // > keep-alive proxies
+  server.headersTimeout = 65_000;
   server.requestTimeout = 30_000;
   server.keepAliveTimeout = 60_000;
 
-  // ── Realtime gateway (Socket.io) ─────────────────────────────────
   try {
     const io = createSocketServer(server);
     setEmitImplementation((room, event, payload) => emitSafe(room, event, payload));
     logger.info('realtime gateway initialized');
     void io;
   } catch (err) {
-    logger.warn({ err: (err as Error).message }, 'realtime gateway failed to initialize — continuing without sockets');
+    logger.warn(
+      { err: (err as Error).message },
+      'realtime gateway failed to initialize — continuing without sockets',
+    );
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -100,9 +96,8 @@ function installShutdownHandlers(server: http.Server): void {
     }, SHUTDOWN_DEADLINE_MS);
     hardDeadline.unref();
 
-    // 1. Stop accepting connections; let in-flight requests drain.
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    // 2. Data stores in dependency order.
+
     stopMetricsCollectors();
     await closeCacheClient().catch(() => undefined);
     await closeQueueClient().catch(() => undefined);
@@ -117,7 +112,11 @@ function installShutdownHandlers(server: http.Server): void {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 
   process.on('message', (msg: unknown) => {
-    if (typeof msg === 'object' && msg !== null && (msg as { type?: string }).type === 'graceful-shutdown') {
+    if (
+      typeof msg === 'object' &&
+      msg !== null &&
+      (msg as { type?: string }).type === 'graceful-shutdown'
+    ) {
       void shutdown('cluster-primary');
     }
   });

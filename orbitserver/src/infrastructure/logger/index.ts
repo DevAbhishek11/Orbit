@@ -1,7 +1,3 @@
-/**
- * Pino logger with mandatory redaction (BUILD_PROMPT rule 13) and request
- * correlation through AsyncLocalStorage — every line carries requestId/userId.
- */
 import pino, { type DestinationStream } from 'pino';
 import { env, isDev } from '../../config/env.js';
 import { getRequestContext } from './requestContext.js';
@@ -70,7 +66,6 @@ export const logger = pino(
   transport,
 );
 
-/** Child logger with extra static bindings (module name, job id, …). */
 export function childLogger(bindings: Record<string, unknown>): pino.Logger {
   return logger.child(bindings);
 }

@@ -1,11 +1,3 @@
-/**
- * redis-cache client (BUILD_PROMPT rule 5): cache / pubsub / presence /
- * rate-limit / idempotency. allkeys-lru eviction; NEVER used by BullMQ.
- *
- * Failure posture (failure mode #3): offline queue disabled, one retry per
- * command, capped backoff + jitter — callers must handle `null` (cache miss)
- * and fall back to Mongo. Losing Redis degrades latency, never correctness.
- */
 import { Redis } from 'ioredis';
 import { env } from '../../config/env.js';
 import { childLogger } from '../logger/index.js';
@@ -25,7 +17,7 @@ export function createCacheClient(): Redis {
   client = new Redis(env.REDIS_CACHE_URL, {
     keyPrefix: `${env.REDIS_KEY_PREFIX}:`,
     lazyConnect: true,
-    enableOfflineQueue: false, // fail fast → callers fall back to Mongo
+    enableOfflineQueue: false,
     maxRetriesPerRequest: 1,
     retryStrategy: (times) => Math.min(50 * 2 ** Math.min(times, 8), 5_000) + Math.random() * 100,
     reconnectOnError: (err) => err.message.includes('READONLY'),

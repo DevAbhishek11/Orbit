@@ -1,6 +1,3 @@
-/**
- * Activities repository — append-only timeline writes/reads.
- */
 import type { ClientSession, Types } from 'mongoose';
 import { clampLimit, decodeCursor, encodeCursor, buildSeekFilter } from '@orbit/shared';
 import { ActivityModel, type IActivity } from './activities.model.js';
@@ -19,7 +16,6 @@ export interface ActivityPage {
   nextCursor: string | null;
 }
 
-/** Timeline for one entity (card modal), newest first, cursor-paginated. */
 export async function listEntityActivity(
   entityType: IActivity['entityType'],
   entityId: string,

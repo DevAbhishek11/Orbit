@@ -1,7 +1,3 @@
-/**
- * Health + metrics routes. Deliberately NOT under /api/v1 and NOT rate-limited
- * (orchestrator probes must never be throttled). /metrics is token-guarded.
- */
 import { Router } from 'express';
 import { env } from '../../config/env.js';
 import { renderMetrics, startMetricsCollectors } from '../../infrastructure/metrics/index.js';
@@ -34,8 +30,7 @@ healthRouter.get('/metrics', async (req, res) => {
   res.send(await renderMetrics());
 });
 
-// A tiny route used by the middleware proof: throws on demand so the error
-// envelope + requestId correlation can be verified end-to-end (Phase 2 AC).
-if (env.NODE_ENV !== 'production') healthRouter.get('/debug/throw', () => {
-  throw new Error('synthetic failure for error-envelope proof');
-});
+if (env.NODE_ENV !== 'production')
+  healthRouter.get('/debug/throw', () => {
+    throw new Error('synthetic failure for error-envelope proof');
+  });

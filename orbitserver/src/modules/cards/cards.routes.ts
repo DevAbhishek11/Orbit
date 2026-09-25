@@ -1,6 +1,3 @@
-/**
- * Card routes (BUILD_PROMPT Phase 6) — including the T2 move endpoint.
- */
 import { Router, type Request } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import { authorize, type ScopeDescriptor } from '../../middleware/authorize.js';
@@ -28,7 +25,12 @@ const writeLimit = rateLimit({ tier: 'write' });
 
 async function boardDescriptor(boardId: string): Promise<ScopeDescriptor | null> {
   const board = await BoardModel.findOne({ _id: boardId })
-    .lean<{ workspaceId: string; createdBy: string; visibility: 'workspace' | 'private'; memberIds: string[] }>()
+    .lean<{
+      workspaceId: string;
+      createdBy: string;
+      visibility: 'workspace' | 'private';
+      memberIds: string[];
+    }>()
     .exec();
   if (!board) return null;
   return {
@@ -39,7 +41,6 @@ async function boardDescriptor(boardId: string): Promise<ScopeDescriptor | null>
   };
 }
 
-/** Scope loader: card → its board's visibility descriptor. */
 async function loadCard(req: Request): Promise<ScopeDescriptor | null> {
   const auth = req.auth!;
   const card =
@@ -49,24 +50,23 @@ async function loadCard(req: Request): Promise<ScopeDescriptor | null> {
   return boardDescriptor(card.boardId);
 }
 
-/**
- * Scope loader for RESTORE: identical to loadCard but it can still see a
- * soft-deleted card. Without this, the default `deletedAt: null` query scope
- * made POST /cards/:id/restore answer 404 for every card it was meant to undo.
- */
 async function loadCardIncludingDeleted(req: Request): Promise<ScopeDescriptor | null> {
   const card = await findCardByIdIncludingDeleted(String(req.params.id));
   if (!card) return null;
   return boardDescriptor(card.boardId);
 }
 
-/** Scope loader: list (for POST /lists/:id/cards). */
 async function loadList(req: Request): Promise<ScopeDescriptor | null> {
   const { findListById } = await import('../boards/boards.repository.js');
   const list = await findListById(String(req.params.id));
   if (!list) return null;
   const board = await BoardModel.findOne({ _id: list.boardId })
-    .lean<{ workspaceId: string; createdBy: string; visibility: 'workspace' | 'private'; memberIds: string[] }>()
+    .lean<{
+      workspaceId: string;
+      createdBy: string;
+      visibility: 'workspace' | 'private';
+      memberIds: string[];
+    }>()
     .exec();
   if (!board) return null;
   return {
@@ -77,7 +77,6 @@ async function loadList(req: Request): Promise<ScopeDescriptor | null> {
   };
 }
 
-// Board-scoped card collection.
 cardsRouter.get(
   '/boards/:id/cards',
   authenticate(),
@@ -95,7 +94,6 @@ cardsRouter.post(
   controller.createCard,
 );
 
-// Card item.
 cardsRouter.get(
   '/cards/:id',
   authenticate(),
@@ -131,8 +129,7 @@ cardsRouter.post(
   authenticate(),
   writeLimit,
   validate({ params: cardParamsSchema }),
-  // loadCardIncludingDeleted — see the note on that loader: the default scope
-  // would hide the very document this route exists to bring back.
+
   authorize('card:update', { load: loadCardIncludingDeleted }),
   controller.restoreCard,
 );

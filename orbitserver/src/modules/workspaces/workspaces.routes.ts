@@ -1,8 +1,3 @@
-/**
- * Workspace routes (BUILD_PROMPT Phase 5).
- * Tenant-scoped routes authorize with a FRESH membership check; the :wid
- * param is the workspace under test — cross-tenant access answers 404.
- */
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import { authorize } from '../../middleware/authorize.js';
@@ -33,7 +28,6 @@ const writeLimit = rateLimit({ tier: 'write' });
 
 workspacesRouter.use(authenticate());
 
-// Collection.
 workspacesRouter.post(
   '/',
   writeLimit,
@@ -43,8 +37,12 @@ workspacesRouter.post(
 );
 workspacesRouter.get('/', controller.listWorkspaces);
 
-// Item — the authorize() membership guard answers 404 for foreign tenants.
-workspacesRouter.get('/:wid', validate({ params: widParams }), authorize('workspace:members:read'), controller.getWorkspace);
+workspacesRouter.get(
+  '/:wid',
+  validate({ params: widParams }),
+  authorize('workspace:members:read'),
+  controller.getWorkspace,
+);
 workspacesRouter.patch(
   '/:wid',
   writeLimit,
@@ -66,7 +64,6 @@ workspacesRouter.post(
 );
 workspacesRouter.post('/:wid/leave', validate({ params: widParams }), controller.leaveWorkspace);
 
-// Members.
 workspacesRouter.get(
   '/:wid/members',
   validate({ params: widParams, query: listMembersQuerySchema }),
@@ -88,7 +85,6 @@ workspacesRouter.delete(
   controller.removeMember,
 );
 
-// Invites.
 workspacesRouter.get(
   '/:wid/invites',
   validate({ params: widParams }),
@@ -104,5 +100,15 @@ workspacesRouter.post(
   controller.inviteMember,
 );
 invitesRouter.use(authenticate());
-invitesRouter.post('/:token/accept', writeLimit, validate({ params: tokenParams }), controller.acceptInvite);
-invitesRouter.post('/:token/decline', writeLimit, validate({ params: tokenParams }), controller.declineInvite);
+invitesRouter.post(
+  '/:token/accept',
+  writeLimit,
+  validate({ params: tokenParams }),
+  controller.acceptInvite,
+);
+invitesRouter.post(
+  '/:token/decline',
+  writeLimit,
+  validate({ params: tokenParams }),
+  controller.declineInvite,
+);

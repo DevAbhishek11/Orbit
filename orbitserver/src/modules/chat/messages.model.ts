@@ -1,7 +1,3 @@
-/**
- * Messages model (BUILD_PROMPT Phase 8 — Slack pillar):
- * Timeline & threads, mentions, embedded reactions and idempotent clientId.
- */
 import mongoose, { type Document, Schema } from 'mongoose';
 import { CONTENT } from '@orbit/shared';
 import { softDeletePlugin } from '../../plugins/softDelete.js';

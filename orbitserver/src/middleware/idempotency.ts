@@ -1,11 +1,3 @@
-/**
- * Idempotency-Key middleware (BUILD_PROMPT Phase 4, failure mode #6):
- *  - POSTs carrying `Idempotency-Key` store {status, body} in Redis for 24 h
- *    under userId+key; a replay returns the stored response VERBATIM.
- *  - Concurrent duplicates race on SETNX: the loser gets 409 LOCK_BUSY.
- *  - If Redis is down, requests proceed without idempotency (logged) —
- *    availability over strictness for non-auth writes.
- */
 import type { RequestHandler } from 'express';
 import { CACHE } from '@orbit/shared';
 import { lockBusy } from '../infrastructure/errors/ApiError.js';
@@ -47,7 +39,6 @@ export function idempotency(): RequestHandler {
     try {
       const won = await client.set(cacheKey, IN_FLIGHT, 'EX', ttl, 'NX');
       if (won === 'OK') {
-        // We own this key — capture the response, store it, release ownership.
         const originalJson = res.json.bind(res);
         res.json = ((body: unknown) => {
           const payload = JSON.stringify({ status: res.statusCode, body });
@@ -59,7 +50,6 @@ export function idempotency(): RequestHandler {
 
         res.on('close', () => {
           if (!res.writableEnded) {
-            // Request died mid-flight — release so the client can retry cleanly.
             client.del(cacheKey).catch(() => undefined);
           }
         });
@@ -74,7 +64,7 @@ export function idempotency(): RequestHandler {
         res.status(status).json(body);
         return;
       }
-      // Still in flight on another request → tell the client to retry shortly.
+
       res.setHeader('Retry-After', '2');
       next(lockBusy('A request with this Idempotency-Key is still in progress'));
     } catch (err) {

@@ -1,6 +1,3 @@
-/**
- * Auth endpoint contracts (Zod = single source of truth, BUILD_PROMPT rule 4).
- */
 import { z } from 'zod';
 
 export const emailSchema = z
@@ -11,7 +8,6 @@ export const emailSchema = z
   .max(254)
   .email('Must be a valid email address');
 
-/** Password policy length floor — full policy runs in the service (context-aware). */
 export const passwordSchema = z
   .string()
   .min(12, 'Password must be at least 12 characters')

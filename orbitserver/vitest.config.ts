@@ -1,7 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 
-// Tests resolve @orbit/shared straight from source — no build step needed.
 const sharedSrc = fileURLToPath(new URL('../shared/src/index.ts', import.meta.url));
 
 export default defineConfig({

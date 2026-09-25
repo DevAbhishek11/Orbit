@@ -1,7 +1,3 @@
-/**
- * Workspaces repository — the only place with workspace/member/invite queries.
- * Every read is workspace-scoped; cross-tenant access answers "not found".
- */
 import type { ClientSession, Types } from 'mongoose';
 import { WorkspaceModel, type IWorkspace } from './workspaces.model.js';
 import { WorkspaceMemberModel, type IWorkspaceMember } from './workspaceMembers.model.js';
@@ -11,8 +7,6 @@ export type InvitationDoc = IInvitation & { _id: Types.ObjectId };
 export type MemberDoc = IWorkspaceMember & { _id: Types.ObjectId };
 export type WorkspaceDoc = IWorkspace & { _id: Types.ObjectId };
 import type { Role } from '@orbit/shared';
-
-// ── Workspaces ────────────────────────────────────────────────────────
 
 export async function createWorkspace(
   data: Pick<IWorkspace, 'name' | 'slug' | 'createdBy'> & Partial<IWorkspace>,
@@ -48,10 +42,16 @@ export function incWorkspaceStats(
   delta: Partial<Record<keyof IWorkspace['stats'], number>>,
   session?: ClientSession,
 ): Promise<unknown> {
-  return WorkspaceModel.updateOne({ _id: id }, { $inc: Object.fromEntries(Object.entries(delta).map(([key, value]) => [`stats.${key}`, value])) }, { session }).exec();
+  return WorkspaceModel.updateOne(
+    { _id: id },
+    {
+      $inc: Object.fromEntries(
+        Object.entries(delta).map(([key, value]) => [`stats.${key}`, value]),
+      ),
+    },
+    { session },
+  ).exec();
 }
-
-// ── Memberships ───────────────────────────────────────────────────────
 
 export async function createMember(
   data: Pick<IWorkspaceMember, 'workspaceId' | 'userId' | 'role'> & Partial<IWorkspaceMember>,
@@ -71,9 +71,7 @@ export function findMembership(
 }
 
 export function findMembershipsByUser(userId: string): Promise<MemberDoc[]> {
-  return WorkspaceMemberModel.find({ userId, status: 'active' })
-    .lean<MemberDoc[]>()
-    .exec();
+  return WorkspaceMemberModel.find({ userId, status: 'active' }).lean<MemberDoc[]>().exec();
 }
 
 export function findMembers(workspaceId: string, limit = 200): Promise<MemberDoc[]> {
@@ -111,14 +109,21 @@ export function setMemberStatus(
   status: 'active' | 'suspended',
   session?: ClientSession,
 ): Promise<unknown> {
-  return WorkspaceMemberModel.updateOne({ workspaceId, userId }, { $set: { status } }, { session }).exec();
+  return WorkspaceMemberModel.updateOne(
+    { workspaceId, userId },
+    { $set: { status } },
+    { session },
+  ).exec();
 }
 
-export function removeMember(workspaceId: string, userId: string, session?: ClientSession): Promise<unknown> {
+export function removeMember(
+  workspaceId: string,
+  userId: string,
+  session?: ClientSession,
+): Promise<unknown> {
   return WorkspaceMemberModel.deleteOne({ workspaceId, userId }, { session }).exec();
 }
 
-/** The user's primary workspace membership (first joined) — default token scope. */
 export async function findPrimaryMembership(userId: string): Promise<MemberDoc | null> {
   const [first] = await WorkspaceMemberModel.find({ userId, status: 'active' })
     .sort({ joinedAt: 1 })
@@ -128,10 +133,11 @@ export async function findPrimaryMembership(userId: string): Promise<MemberDoc |
   return first ?? null;
 }
 
-// ── Invitations ───────────────────────────────────────────────────────
-
 export async function createInvitation(
-  data: Pick<IInvitation, 'workspaceId' | 'email' | 'role' | 'tokenHash' | 'invitedBy' | 'expiresAt'>,
+  data: Pick<
+    IInvitation,
+    'workspaceId' | 'email' | 'role' | 'tokenHash' | 'invitedBy' | 'expiresAt'
+  >,
   session?: ClientSession,
 ): Promise<InvitationDoc> {
   const [invite] = await InvitationModel.create([data], { session });
@@ -142,10 +148,7 @@ export async function findInvitationByTokenHash(tokenHash: string): Promise<Invi
   return (await InvitationModel.findOne({ tokenHash }).lean<InvitationDoc>().exec()) ?? null;
 }
 
-export function findPendingInvite(
-  workspaceId: string,
-  email: string,
-): Promise<IInvitation | null> {
+export function findPendingInvite(workspaceId: string, email: string): Promise<IInvitation | null> {
   return InvitationModel.findOne({
     workspaceId,
     email: email.toLowerCase(),
@@ -157,7 +160,6 @@ export function findPendingInvite(
     .exec();
 }
 
-/** Invitations for a workspace, newest first (pending first, then history). */
 export function findInvitationsByWorkspace(
   workspaceId: string,
   limit = 50,
@@ -169,7 +171,10 @@ export function findInvitationsByWorkspace(
     .exec();
 }
 
-export function markInvitationAccepted(invitationId: string, session?: ClientSession): Promise<InvitationDoc | null> {
+export function markInvitationAccepted(
+  invitationId: string,
+  session?: ClientSession,
+): Promise<InvitationDoc | null> {
   const q = InvitationModel.findOneAndUpdate(
     { _id: invitationId, acceptedAt: null, declinedAt: null },
     { $set: { acceptedAt: new Date() } },

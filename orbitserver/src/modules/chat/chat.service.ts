@@ -1,7 +1,3 @@
-/**
- * Chat service (BUILD_PROMPT Phase 8 — Slack pillar):
- * Channels, messages, threads, reactions, read status, idempotency via clientId.
- */
 import { forbiddenScope, notFound } from '../../infrastructure/errors/ApiError.js';
 import { runInTransaction } from '../../infrastructure/db/transaction.js';
 import { emitSafe } from '../../infrastructure/events/eventBus.js';
@@ -12,12 +8,14 @@ import type { MessageDoc } from './messages.model.js';
 import type { CreateChannelInput, SendMessageInput, UpdateChannelInput } from './chat.schema.js';
 
 function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || 'channel';
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'channel'
+  );
 }
 
 export async function createChannel(
@@ -28,7 +26,6 @@ export async function createChannel(
   const memberIds = Array.from(new Set([actorId, ...(input.memberIds ?? [])]));
   let slug = slugify(input.name);
 
-  // If DM, dedupe existing DM with identical members
   if (input.type === 'dm') {
     const existing = await repo.findChannelsByWorkspace(workspaceId, actorId);
     const sortedMembers = [...memberIds].sort();
@@ -63,7 +60,9 @@ export async function listChannels(
   const readMap = new Map(reads.map((r) => [r.channelId, r.lastReadAt]));
 
   return channels.map((c) => {
-    const raw = c.toObject ? (c.toObject() as Record<string, unknown>) : (c as unknown as Record<string, unknown>);
+    const raw = c.toObject
+      ? (c.toObject() as Record<string, unknown>)
+      : (c as unknown as Record<string, unknown>);
     const lastRead = readMap.get(c._id.toString());
     const hasUnread =
       Boolean(c.lastMessage) &&
@@ -104,7 +103,6 @@ export async function sendMessage(
   input: SendMessageInput,
   authorId: string,
 ): Promise<MessageDoc> {
-  // Idempotency: if clientId already posted, return existing message
   if (input.clientId) {
     const existing = await repo.findMessageByClientId(input.clientId);
     if (existing) return existing;
@@ -168,7 +166,6 @@ export async function sendMessage(
     return msg;
   });
 
-  // After commit: emit + enqueue (never inside transaction)
   try {
     if (message.threadRootId) {
       emitSafe(`channel:${channelId}`, 'thread:updated', {
@@ -187,7 +184,6 @@ export async function sendMessage(
       });
     }
 
-    // Enqueue notification fan-out and search indexing
     void enqueue('notifications', 'fan-out', {
       type: 'message:new',
       workspaceId,
@@ -201,9 +197,7 @@ export async function sendMessage(
       entityId: message._id.toString(),
       workspaceId,
     });
-  } catch {
-    // Swallow — socket/queue failures must never fail request
-  }
+  } catch {}
 
   return message;
 }
@@ -218,7 +212,7 @@ export async function listMessages(
   if (!channel) throw notFound('Channel');
   const beforeDate = before ? new Date(before) : undefined;
   const messages = await repo.findMessagesByChannel(channelId, limit, beforeDate);
-  return messages.reverse(); // Return oldest to newest for timeline rendering
+  return messages.reverse();
 }
 
 export async function getThread(
@@ -286,7 +280,6 @@ export async function deleteMessage(
   if (!message || message.workspaceId !== workspaceId) throw notFound('Message');
   if (message.authorId !== userId) throw forbiddenScope('You can only delete your own messages');
 
-  // Tombstone pattern
   await repo.updateMessageById(messageId, {
     body: '[Message deleted]',
     deletedAt: new Date(),

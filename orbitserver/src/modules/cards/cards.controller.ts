@@ -1,6 +1,3 @@
-/**
- * Cards controller — HTTP plumbing only.
- */
 import type { Request, Response } from 'express';
 import { created, noContent, ok } from '../../infrastructure/http/response.js';
 import { requireAuth } from '../../middleware/authenticate.js';
@@ -21,10 +18,15 @@ export async function listCards(req: Request, res: Response): Promise<void> {
 
 export async function createCard(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const card = await service.createCardInList(String(req.params.id), auth.workspaceId!, req.body as CreateCardInput, {
-    userId: auth.userId,
-    role: auth.role!,
-  });
+  const card = await service.createCardInList(
+    String(req.params.id),
+    auth.workspaceId!,
+    req.body as CreateCardInput,
+    {
+      userId: auth.userId,
+      role: auth.role!,
+    },
+  );
   created(res, card);
 }
 
@@ -37,10 +39,15 @@ export async function updateCard(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
   ok(
     res,
-    await service.updateCardDetails(String(req.params.id), auth.workspaceId!, req.body as UpdateCardInput, {
-      userId: auth.userId,
-      role: auth.role!,
-    }),
+    await service.updateCardDetails(
+      String(req.params.id),
+      auth.workspaceId!,
+      req.body as UpdateCardInput,
+      {
+        userId: auth.userId,
+        role: auth.role!,
+      },
+    ),
   );
 }
 
@@ -57,16 +64,22 @@ export async function moveCard(req: Request, res: Response): Promise<void> {
 
 export async function deleteCard(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  await service.deleteCardSoft(String(req.params.id), auth.workspaceId!, { userId: auth.userId, role: auth.role! });
+  await service.deleteCardSoft(String(req.params.id), auth.workspaceId!, {
+    userId: auth.userId,
+    role: auth.role!,
+  });
   noContent(res);
 }
 
 export async function restoreCard(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  ok(res, await service.restoreSoftDeletedCard(String(req.params.id), auth.workspaceId!, {
-    userId: auth.userId,
-    role: auth.role!,
-  }));
+  ok(
+    res,
+    await service.restoreSoftDeletedCard(String(req.params.id), auth.workspaceId!, {
+      userId: auth.userId,
+      role: auth.role!,
+    }),
+  );
 }
 
 export async function cardActivity(req: Request, res: Response): Promise<void> {
@@ -85,18 +98,27 @@ export async function cardComments(req: Request, res: Response): Promise<void> {
 
 export async function addComment(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const comment = await service.addCardComment(String(req.params.id), auth.workspaceId!, req.body as CommentInput, {
-    userId: auth.userId,
-    role: auth.role!,
-  });
+  const comment = await service.addCardComment(
+    String(req.params.id),
+    auth.workspaceId!,
+    req.body as CommentInput,
+    {
+      userId: auth.userId,
+      role: auth.role!,
+    },
+  );
   created(res, comment);
 }
 
 export async function createFromMessage(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const card = await service.createCardFromMessage(auth.workspaceId!, req.body as CreateCardFromMessageInput, {
-    userId: auth.userId,
-    role: auth.role!,
-  });
+  const card = await service.createCardFromMessage(
+    auth.workspaceId!,
+    req.body as CreateCardFromMessageInput,
+    {
+      userId: auth.userId,
+      role: auth.role!,
+    },
+  );
   created(res, card);
 }

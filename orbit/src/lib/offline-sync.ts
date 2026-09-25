@@ -1,8 +1,8 @@
-import { flushOutbox, getOutboxCount } from './offline-db';
+import { flushOutbox, getOutboxCount } from "./offline-db";
 
 type OfflineListener = (online: boolean, pending: number) => void;
 const listeners = new Set<OfflineListener>();
-let onlineState = typeof navigator !== 'undefined' ? navigator.onLine : true;
+let onlineState = typeof navigator !== "undefined" ? navigator.onLine : true;
 let pendingCount = 0;
 
 export function subscribeOffline(cb: OfflineListener): () => void {
@@ -25,7 +25,7 @@ async function refreshPending() {
 }
 
 export function initOfflineSync() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   const onOnline = async () => {
     onlineState = true;
@@ -33,7 +33,7 @@ export function initOfflineSync() {
       const res = await flushOutbox();
       console.info(`[offline] flushed ${res.flushed}, failed ${res.failed}`);
     } catch (e) {
-      console.warn('[offline] flush failed', e);
+      console.warn("[offline] flush failed", e);
     }
     await refreshPending();
   };
@@ -43,18 +43,21 @@ export function initOfflineSync() {
     emit();
   };
 
-  window.addEventListener('online', onOnline);
-  window.addEventListener('offline', onOffline);
+  window.addEventListener("online", onOnline);
+  window.addEventListener("offline", onOffline);
 
   refreshPending();
   if (onlineState) {
-    flushOutbox().then(refreshPending).catch(() => refreshPending());
+    flushOutbox()
+      .then(refreshPending)
+      .catch(() => refreshPending());
   }
 
-  // periodic retry
   setInterval(() => {
     if (onlineState) {
-      flushOutbox().then(refreshPending).catch(() => {});
+      flushOutbox()
+        .then(refreshPending)
+        .catch(() => {});
     } else {
       refreshPending();
     }

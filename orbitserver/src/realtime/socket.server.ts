@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await */
-/**
- * Realtime gateway — Socket.io with Redis adapter (BUILD_PROMPT Phase 9).
- */
 import type http from 'node:http';
 import { Server as SocketServer, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
@@ -187,7 +183,10 @@ export function createSocketServer(httpServer: http.Server): SocketServer {
         }
         const perm = await checkRoomPermission(room, auth);
         if (!perm.allowed) {
-          ack?.({ ok: false, error: { code: 'FORBIDDEN_ROOM', message: perm.reason ?? 'Forbidden' } });
+          ack?.({
+            ok: false,
+            error: { code: 'FORBIDDEN_ROOM', message: perm.reason ?? 'Forbidden' },
+          });
           socket.emit('error', { code: 'FORBIDDEN_ROOM', message: perm.reason ?? 'Forbidden' });
           return;
         }
@@ -246,7 +245,10 @@ export function createSocketServer(httpServer: http.Server): SocketServer {
 
     socket.on(
       'message:send',
-      (data: { channelId: string; body: string; clientId?: string; fileIds?: string[] }, ack?: (res: unknown) => void) => {
+      (
+        data: { channelId: string; body: string; clientId?: string; fileIds?: string[] },
+        ack?: (res: unknown) => void,
+      ) => {
         void (async () => {
           if (!checkRateLimit(socket.id)) {
             ack?.({ ok: false, error: { code: 'RATE_LIMITED' } });
@@ -254,7 +256,10 @@ export function createSocketServer(httpServer: http.Server): SocketServer {
           }
           const { channelId, body, clientId, fileIds } = data ?? {};
           if (!channelId || !body) {
-            ack?.({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'channelId and body required' } });
+            ack?.({
+              ok: false,
+              error: { code: 'VALIDATION_ERROR', message: 'channelId and body required' },
+            });
             return;
           }
           try {
@@ -274,7 +279,10 @@ export function createSocketServer(httpServer: http.Server): SocketServer {
             io.to(`channel:${channelId}`).emit('message:new', { message, clientId });
             ack?.({ ok: true, data: { message } });
           } catch (err) {
-            log.warn({ err: (err as Error).message, userId: auth.userId, channelId }, 'socket message:send failed');
+            log.warn(
+              { err: (err as Error).message, userId: auth.userId, channelId },
+              'socket message:send failed',
+            );
             ack?.({ ok: false, error: { code: 'SEND_FAILED', message: (err as Error).message } });
           }
         })();
@@ -286,11 +294,14 @@ export function createSocketServer(httpServer: http.Server): SocketServer {
       ack?.({ ok: true });
     });
 
-    socket.on('sync:since', (data: { scope: string; updatedAt: string }, ack?: (res: unknown) => void) => {
-      const since = data?.updatedAt ? new Date(data.updatedAt) : new Date(Date.now() - 120_000);
-      log.debug({ userId: auth.userId, scope: data?.scope, since }, 'sync:since requested');
-      ack?.({ ok: true, data: { since: since.toISOString(), changes: [] } });
-    });
+    socket.on(
+      'sync:since',
+      (data: { scope: string; updatedAt: string }, ack?: (res: unknown) => void) => {
+        const since = data?.updatedAt ? new Date(data.updatedAt) : new Date(Date.now() - 120_000);
+        log.debug({ userId: auth.userId, scope: data?.scope, since }, 'sync:since requested');
+        ack?.({ ok: true, data: { since: since.toISOString(), changes: [] } });
+      },
+    );
 
     socket.on('disconnect', (reason) => {
       log.info({ userId: auth.userId, socketId: socket.id, reason }, 'socket disconnected');
@@ -340,9 +351,7 @@ function setPresence(userId: string, workspaceId?: string): void {
       const key = `presence:${workspaceId ?? 'global'}:${userId}`;
       client.set(key, 'online', 'EX', 60).catch(() => undefined);
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 function clearPresence(userId: string): void {
@@ -350,13 +359,14 @@ function clearPresence(userId: string): void {
   try {
     const client = getCacheClient();
     if (client?.status === 'ready') {
-      client.keys(`presence:*:${userId}`).then((keys) => {
-        if (keys.length) void client.del(...keys).catch(() => undefined);
-      }).catch(() => undefined);
+      client
+        .keys(`presence:*:${userId}`)
+        .then((keys) => {
+          if (keys.length) void client.del(...keys).catch(() => undefined);
+        })
+        .catch(() => undefined);
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 function setTyping(channelId: string, userId: string): void {
@@ -367,9 +377,7 @@ function setTyping(channelId: string, userId: string): void {
       const key = `typing:${channelId}:${userId}`;
       client.set(key, '1', 'EX', 4).catch(() => undefined);
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 function clearTyping(channelId: string, userId: string): void {
@@ -379,9 +387,7 @@ function clearTyping(channelId: string, userId: string): void {
     if (client?.status === 'ready') {
       client.del(`typing:${channelId}:${userId}`).catch(() => undefined);
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 export function emitSafe(room: string, event: string, payload: Record<string, unknown> = {}): void {
