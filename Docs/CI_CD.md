@@ -1,10 +1,22 @@
 # CI/CD Pipeline Documentation
 
-Orbit employs GitHub Actions for continuous integration and automated deployment.
+Orbit includes production-grade GitHub Actions pipeline configurations located in `Docs/workflows/`.
 
 ---
 
-## 1. Continuous Integration (`ci.yml`)
+## 1. Quick Setup: Activating Workflows
+
+To link and activate the workflows in GitHub:
+
+```bash
+mkdir -p .github/workflows
+cp Docs/workflows/ci.yml .github/workflows/
+cp Docs/workflows/cd.yml .github/workflows/
+```
+
+---
+
+## 2. Continuous Integration (`ci.yml`)
 
 The CI workflow triggers on every commit pushed and every pull request across all branches.
 
