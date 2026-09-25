@@ -118,7 +118,7 @@ export function createSocketServer(httpServer: http.Server): SocketServer {
     const cacheClient = getCacheClient();
     if (cacheClient && cacheClient.status === 'ready') {
       const pubClient = cacheClient;
-      const subClient = pubClient.duplicate();
+      const subClient = pubClient.duplicate({ enableOfflineQueue: true });
       subClient.connect().catch(() => {
         log.warn('socket redis sub client failed to connect — using in-memory adapter');
       });
