@@ -64,9 +64,7 @@
   "paths": {
     "/api/v1/auth/me": {
       "get": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Get current user",
         "security": [
           {
@@ -92,9 +90,7 @@
     },
     "/api/v1/auth/login": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Login",
         "security": [
           {
@@ -120,9 +116,7 @@
     },
     "/api/v1/auth/register": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Register",
         "security": [
           {
@@ -148,9 +142,7 @@
     },
     "/api/v1/auth/refresh": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Refresh access token",
         "security": [
           {
@@ -176,9 +168,7 @@
     },
     "/api/v1/auth/logout": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Logout",
         "security": [
           {
@@ -204,9 +194,7 @@
     },
     "/api/v1/workspaces": {
       "get": {
-        "tags": [
-          "workspaces"
-        ],
+        "tags": ["workspaces"],
         "summary": "List workspaces",
         "security": [
           {
@@ -230,9 +218,7 @@
         }
       },
       "post": {
-        "tags": [
-          "workspaces"
-        ],
+        "tags": ["workspaces"],
         "summary": "Create workspace",
         "security": [
           {
@@ -258,9 +244,7 @@
     },
     "/api/v1/workspaces/{workspaceId}/members": {
       "get": {
-        "tags": [
-          "workspaces"
-        ],
+        "tags": ["workspaces"],
         "summary": "List members",
         "security": [
           {
@@ -286,9 +270,7 @@
     },
     "/api/v1/boards": {
       "get": {
-        "tags": [
-          "boards"
-        ],
+        "tags": ["boards"],
         "summary": "List boards",
         "security": [
           {
@@ -312,9 +294,7 @@
         }
       },
       "post": {
-        "tags": [
-          "boards"
-        ],
+        "tags": ["boards"],
         "summary": "Create board",
         "security": [
           {
@@ -340,9 +320,7 @@
     },
     "/api/v1/boards/{boardId}": {
       "get": {
-        "tags": [
-          "boards"
-        ],
+        "tags": ["boards"],
         "summary": "Get board with lists/cards",
         "security": [
           {
@@ -366,9 +344,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "boards"
-        ],
+        "tags": ["boards"],
         "summary": "Update board",
         "security": [
           {
@@ -392,9 +368,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "boards"
-        ],
+        "tags": ["boards"],
         "summary": "Archive board",
         "security": [
           {
@@ -420,9 +394,7 @@
     },
     "/api/v1/boards/{boardId}/lists": {
       "post": {
-        "tags": [
-          "boards"
-        ],
+        "tags": ["boards"],
         "summary": "Create list",
         "security": [
           {
@@ -448,9 +420,7 @@
     },
     "/api/v1/lists/{listId}": {
       "patch": {
-        "tags": [
-          "boards"
-        ],
+        "tags": ["boards"],
         "summary": "Update list",
         "security": [
           {
@@ -476,9 +446,7 @@
     },
     "/api/v1/lists/{listId}/cards": {
       "post": {
-        "tags": [
-          "cards"
-        ],
+        "tags": ["cards"],
         "summary": "Create card",
         "security": [
           {
@@ -504,9 +472,7 @@
     },
     "/api/v1/cards/{cardId}": {
       "get": {
-        "tags": [
-          "cards"
-        ],
+        "tags": ["cards"],
         "summary": "Get card",
         "security": [
           {
@@ -530,9 +496,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "cards"
-        ],
+        "tags": ["cards"],
         "summary": "Update card",
         "security": [
           {
@@ -556,9 +520,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "cards"
-        ],
+        "tags": ["cards"],
         "summary": "Delete card",
         "security": [
           {
@@ -584,9 +546,7 @@
     },
     "/api/v1/cards/{cardId}/move": {
       "post": {
-        "tags": [
-          "cards"
-        ],
+        "tags": ["cards"],
         "summary": "Move card",
         "security": [
           {
@@ -612,9 +572,7 @@
     },
     "/api/v1/boards/{boardId}/pages": {
       "get": {
-        "tags": [
-          "pages"
-        ],
+        "tags": ["pages"],
         "summary": "List pages",
         "security": [
           {
@@ -638,9 +596,7 @@
         }
       },
       "post": {
-        "tags": [
-          "pages"
-        ],
+        "tags": ["pages"],
         "summary": "Create page",
         "security": [
           {
@@ -666,9 +622,7 @@
     },
     "/api/v1/pages/{pageId}": {
       "get": {
-        "tags": [
-          "pages"
-        ],
+        "tags": ["pages"],
         "summary": "Get page",
         "security": [
           {
@@ -692,9 +646,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "pages"
-        ],
+        "tags": ["pages"],
         "summary": "Update page",
         "security": [
           {
@@ -720,9 +672,7 @@
     },
     "/api/v1/channels": {
       "get": {
-        "tags": [
-          "chat"
-        ],
+        "tags": ["chat"],
         "summary": "List channels",
         "security": [
           {
@@ -746,9 +696,7 @@
         }
       },
       "post": {
-        "tags": [
-          "chat"
-        ],
+        "tags": ["chat"],
         "summary": "Create channel",
         "security": [
           {
@@ -774,9 +722,7 @@
     },
     "/api/v1/channels/{channelId}/messages": {
       "get": {
-        "tags": [
-          "chat"
-        ],
+        "tags": ["chat"],
         "summary": "List messages",
         "security": [
           {
@@ -800,9 +746,7 @@
         }
       },
       "post": {
-        "tags": [
-          "chat"
-        ],
+        "tags": ["chat"],
         "summary": "Send message",
         "security": [
           {
@@ -828,9 +772,7 @@
     },
     "/api/v1/search": {
       "get": {
-        "tags": [
-          "search"
-        ],
+        "tags": ["search"],
         "summary": "Global search",
         "security": [
           {
@@ -856,10 +798,34 @@
     },
     "/api/v1/analytics/overview": {
       "get": {
-        "tags": [
-          "analytics"
-        ],
+        "tags": ["analytics"],
         "summary": "Analytics overview",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/files": {
+      "get": {
+        "tags": ["files"],
+        "summary": "List workspace files",
         "security": [
           {
             "bearerAuth": []
@@ -884,10 +850,34 @@
     },
     "/api/v1/files/presign": {
       "post": {
-        "tags": [
-          "files"
-        ],
+        "tags": ["files"],
         "summary": "Presign upload",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/files/{fileId}/raw": {
+      "post": {
+        "tags": ["files"],
+        "summary": "Upload file bytes (streaming)",
         "security": [
           {
             "bearerAuth": []
@@ -912,9 +902,7 @@
     },
     "/api/v1/notifications": {
       "get": {
-        "tags": [
-          "notifications"
-        ],
+        "tags": ["notifications"],
         "summary": "List notifications",
         "security": [
           {
@@ -940,9 +928,7 @@
     },
     "/health/live": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Liveness",
         "security": [],
         "responses": {
@@ -964,9 +950,7 @@
     },
     "/health/ready": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Readiness",
         "security": [],
         "responses": {
@@ -998,11 +982,7 @@
     "schemas": {
       "Envelope": {
         "type": "object",
-        "required": [
-          "success",
-          "data",
-          "meta"
-        ],
+        "required": ["success", "data", "meta"],
         "properties": {
           "success": {
             "type": "boolean",
@@ -1018,10 +998,7 @@
                 "type": "string"
               },
               "nextCursor": {
-                "type": [
-                  "string",
-                  "null"
-                ],
+                "type": ["string", "null"],
                 "nullable": true
               },
               "cached": {

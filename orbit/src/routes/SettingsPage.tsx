@@ -1,17 +1,23 @@
 import { useState, type FormEvent } from "react";
+import { LogOut, MonitorSmartphone } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../api/client";
 import { authApi, usersApi } from "../api/endpoints";
-import { useAuth } from "../state/auth";
-import { useToast } from "../state/toast";
 import {
   Avatar,
   Badge,
+  Button,
+  Card,
+  CardHeader,
   ConfirmDialog,
   ErrorBox,
   Field,
-  Spinner,
+  Input,
+  PageHeader,
+  Select,
 } from "../components/ui";
+import { useAuth } from "../state/auth";
+import { useToast } from "../state/toast";
 
 const TIMEZONES = [
   "UTC",
@@ -22,6 +28,35 @@ const TIMEZONES = [
   "America/New_York",
   "America/Los_Angeles",
 ];
+
+function ToggleRow({
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3 py-1.5">
+      <span className="text-[12.5px] font-semibold text-ink">{label}</span>
+      <span className="relative inline-flex">
+        <input
+          type="checkbox"
+          className="peer sr-only"
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        <span className="h-5 w-9 rounded-full bg-line-strong/60 transition-colors peer-checked:bg-brand peer-disabled:opacity-50" />
+        <span className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+      </span>
+    </label>
+  );
+}
 
 export function SettingsPage() {
   const { user, setUser } = useAuth();
@@ -92,33 +127,27 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="page">
-      <div className="page__header">
-        <div className="page__header-text">
-          <h1>My settings</h1>
-          <p className="page__subtitle">
-            Profile, notifications and active sessions
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[1000px] px-5 py-6">
+      <PageHeader
+        title="My settings"
+        subtitle="Profile, notifications and active sessions"
+      />
 
-      <div className="grid grid--two">
-        <section className="panel">
-          <div className="row" style={{ gap: 14, marginBottom: 18 }}>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card>
+          <div className="mb-5 flex items-center gap-3.5">
             <Avatar name={user.name} url={user.avatarUrl} size="lg" />
             <div>
-              <h2>{user.name}</h2>
-              <div className="faint" style={{ fontSize: 12.5 }}>
-                @{user.handle}
-              </div>
-              <div style={{ marginTop: 4 }}>
+              <h2 className="text-[14.5px] font-bold text-ink">{user.name}</h2>
+              <div className="text-[12px] text-faint">@{user.handle}</div>
+              <div className="mt-1.5 flex items-center gap-2">
                 {user.emailVerified ? (
                   <Badge tone="success">email verified</Badge>
                 ) : (
                   <Badge tone="warning">email not verified</Badge>
                 )}
-                <span className="faint" style={{ marginLeft: 8, fontSize: 12 }}>
-                  account status: {user.status}
+                <span className="text-[11.5px] text-faint">
+                  status: {user.status}
                 </span>
               </div>
             </div>
@@ -128,10 +157,9 @@ export function SettingsPage() {
             <ErrorBox message={(profile.error as ApiError).message} />
           ) : null}
 
-          <form onSubmit={submitProfile}>
+          <form onSubmit={submitProfile} className="space-y-4">
             <Field label="Display name">
-              <input
-                className="input"
+              <Input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 maxLength={120}
@@ -139,8 +167,7 @@ export function SettingsPage() {
               />
             </Field>
             <Field label="Timezone" hint="Used for due dates and quiet hours.">
-              <select
-                className="select"
+              <Select
                 value={timezone}
                 onChange={(event) => setTimezone(event.target.value)}
               >
@@ -149,33 +176,27 @@ export function SettingsPage() {
                     {zone}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Avatar URL" hint="Optional — any public image URL.">
-              <input
-                className="input"
+              <Input
                 value={avatarUrl}
                 onChange={(event) => setAvatarUrl(event.target.value)}
                 type="url"
                 maxLength={2048}
+                placeholder="https://…"
               />
             </Field>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={profile.isPending}
-            >
-              {profile.isPending ? <Spinner /> : null}
+            <Button type="submit" variant="primary" loading={profile.isPending}>
               Save profile
-            </button>
+            </Button>
           </form>
-        </section>
+        </Card>
 
-        <section className="panel">
-          <h2 style={{ marginBottom: 16 }}>Preferences</h2>
+        <Card>
+          <CardHeader title="Preferences" />
           <Field label="Theme">
-            <select
-              className="select"
+            <Select
               value={user.preferences.theme}
               disabled={prefs.isPending}
               onChange={(event) =>
@@ -189,41 +210,34 @@ export function SettingsPage() {
               <option value="system">System</option>
               <option value="dark">Dark</option>
               <option value="light">Light</option>
-            </select>
+            </Select>
           </Field>
-          <label className="checkbox" style={{ marginBottom: 10 }}>
-            <input
-              type="checkbox"
+          <div className="mt-3 divide-y divide-line/70">
+            <ToggleRow
+              label="Email notifications"
               checked={user.preferences.emailNotifications}
               disabled={prefs.isPending}
-              onChange={(event) =>
-                prefs.mutate({
-                  preferences: { emailNotifications: event.target.checked },
-                })
+              onChange={(next) =>
+                prefs.mutate({ preferences: { emailNotifications: next } })
               }
             />
-            Email notifications
-          </label>
-          <label className="checkbox" style={{ marginBottom: 18 }}>
-            <input
-              type="checkbox"
+            <ToggleRow
+              label="Push notifications"
               checked={user.preferences.pushNotifications}
               disabled={prefs.isPending}
-              onChange={(event) =>
-                prefs.mutate({
-                  preferences: { pushNotifications: event.target.checked },
-                })
+              onChange={(next) =>
+                prefs.mutate({ preferences: { pushNotifications: next } })
               }
             />
-            Push notifications
-          </label>
+          </div>
 
-          <h2 style={{ marginBottom: 12 }}>Quiet hours</h2>
-          <div className="row">
-            <input
-              className="input"
+          <h3 className="mb-2 mt-6 text-[13px] font-bold text-ink">
+            Quiet hours
+          </h3>
+          <div className="flex items-center gap-2.5">
+            <Input
               type="time"
-              style={{ maxWidth: 130 }}
+              className="w-[130px]"
               value={user.preferences.quietHoursStart ?? ""}
               disabled={prefs.isPending}
               onChange={(event) =>
@@ -232,11 +246,10 @@ export function SettingsPage() {
                 })
               }
             />
-            <span className="faint">to</span>
-            <input
-              className="input"
+            <span className="text-[12px] text-faint">to</span>
+            <Input
               type="time"
-              style={{ maxWidth: 130 }}
+              className="w-[130px]"
               value={user.preferences.quietHoursEnd ?? ""}
               disabled={prefs.isPending}
               onChange={(event) =>
@@ -246,80 +259,69 @@ export function SettingsPage() {
               }
             />
           </div>
-        </section>
+        </Card>
       </div>
 
-      <section className="panel" style={{ marginTop: 20 }}>
-        <div className="row row--between" style={{ marginBottom: 14 }}>
-          <h2>Active sessions</h2>
-          <button
-            type="button"
-            className="btn btn--danger btn--sm"
-            onClick={() => setRevokeAll(true)}
-          >
-            Sign out everywhere
-          </button>
-        </div>
-        <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
-          Each row is one refresh-token family. Revoking it forces that device
-          to sign in again.
-        </p>
-        <div className="stack" style={{ gap: 8 }}>
+      <Card className="mt-5">
+        <CardHeader
+          title="Active sessions"
+          subtitle="Each row is one refresh-token family. Revoking it forces that device to sign in again."
+          actions={
+            <Button
+              variant="danger"
+              size="sm"
+              icon={LogOut}
+              onClick={() => setRevokeAll(true)}
+            >
+              Sign out everywhere
+            </Button>
+          }
+        />
+        <div className="space-y-2">
           {(sessionsQuery.data?.sessions ?? []).map((session) => (
             <div
               key={session.id}
-              className="row row--between"
-              style={{
-                padding: "10px 12px",
-                background: "var(--surface)",
-                borderRadius: 10,
-                border: "1px solid var(--border)",
-              }}
+              className="flex items-center justify-between gap-3 rounded-lg border border-line px-3.5 py-2.5"
             >
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 500 }}>
-                  {session.device}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-[12.5px] font-bold text-ink">
+                  <MonitorSmartphone
+                    size={13}
+                    className="shrink-0 text-faint"
+                    aria-hidden
+                  />
+                  <span className="truncate">{session.device}</span>
                   {session.current ? (
-                    <Badge tone="accent">this device</Badge>
+                    <Badge tone="brand">this device</Badge>
                   ) : null}
                 </div>
-                <div
-                  className="faint"
-                  style={{
-                    fontSize: 12,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    maxWidth: 460,
-                  }}
-                >
+                <div className="mt-0.5 truncate text-[11.5px] text-faint">
                   {session.ip ? `${session.ip} · ` : ""}
                   {session.userAgent ?? "unknown user agent"}
                 </div>
-                <div className="faint" style={{ fontSize: 11.5 }}>
+                <div className="text-[11px] text-faint">
                   last used {new Date(session.lastUsedAt).toLocaleString()} ·
                   expires {new Date(session.expiresAt).toLocaleDateString()}
                 </div>
               </div>
               {!session.current ? (
-                <button
-                  type="button"
-                  className="btn btn--sm"
-                  disabled={revoke.isPending}
+                <Button
+                  size="xs"
+                  loading={revoke.isPending}
                   onClick={() => revoke.mutate(session.id)}
                 >
                   Revoke
-                </button>
+                </Button>
               ) : null}
             </div>
           ))}
           {sessionsQuery.data && sessionsQuery.data.sessions.length === 0 ? (
-            <p className="faint" style={{ margin: 0, fontSize: 13 }}>
+            <p className="text-[12.5px] text-faint">
               No other active sessions.
             </p>
           ) : null}
         </div>
-      </section>
+      </Card>
 
       {revokeAll ? (
         <ConfirmDialog

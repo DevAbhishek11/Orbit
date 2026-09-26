@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Archive, ArchiveRestore, Plus, X } from "lucide-react";
 import { ApiError } from "../api/client";
 import { cardsApi, workspacesApi } from "../api/endpoints";
 import type { Card, Checklist } from "../api/types";
@@ -8,15 +9,20 @@ import { useToast } from "../state/toast";
 import {
   Avatar,
   Badge,
+  Button,
+  CenterState,
   ConfirmDialog,
   ErrorBox,
   Field,
+  Input,
   Modal,
-  Spinner,
+  ProgressBar,
+  Select,
+  Textarea,
 } from "./ui";
 
 const LABEL_COLORS = [
-  "#6c8cff",
+  "#f26b1d",
   "#a06bff",
   "#3ecf8e",
   "#f5a524",
@@ -34,6 +40,14 @@ function toDateInput(value: string | null): string {
   const date = new Date(value);
   const offset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-faint">
+      {children}
+    </div>
+  );
 }
 
 export function CardModal({
@@ -142,17 +156,15 @@ export function CardModal({
 
   if (cardQuery.isLoading) {
     return (
-      <Modal title="Card" onClose={onClose} wide={false}>
-        <div className="center-state" style={{ height: 160 }}>
-          <Spinner large />
-        </div>
+      <Modal title="Card" onClose={onClose} size="sm">
+        <CenterState>Loading card…</CenterState>
       </Modal>
     );
   }
 
   if (cardQuery.isError || !card) {
     return (
-      <Modal title="Card" onClose={onClose} wide={false}>
+      <Modal title="Card" onClose={onClose} size="sm">
         <ErrorBox
           message={
             (cardQuery.error as ApiError)?.message ?? "Could not load this card"
@@ -220,10 +232,10 @@ export function CardModal({
   };
 
   const toggleAssignee = (userId: string) => {
-    const currentAssignees = card.assignees ?? [];
-    const assignees = currentAssignees.includes(userId)
-      ? currentAssignees.filter((id) => id !== userId)
-      : [...currentAssignees, userId];
+    const current = card.assignees ?? [];
+    const assignees = current.includes(userId)
+      ? current.filter((id) => id !== userId)
+      : [...current, userId];
     patch.mutate({ assignees });
   };
 
@@ -236,53 +248,47 @@ export function CardModal({
     <>
       <Modal
         title={
-          <div className="row" style={{ gap: 8 }}>
-            <span>Card</span>
-            <Badge tone="accent">v{card.version}</Badge>
+          <span className="flex items-center gap-2">
+            Card
+            <Badge tone="brand">v{card.version}</Badge>
             {card.archivedAt ? <Badge tone="warning">archived</Badge> : null}
             {card.completedAt ? <Badge tone="success">completed</Badge> : null}
-          </div>
+          </span>
         }
         onClose={onClose}
+        size="lg"
         footer={
           <>
             {!readOnly && card.archivedAt ? (
-              <button
-                type="button"
-                className="btn"
-                disabled={restoreMutation.isPending}
+              <Button
+                icon={ArchiveRestore}
+                loading={restoreMutation.isPending}
                 onClick={() => restoreMutation.mutate()}
               >
-                {restoreMutation.isPending ? <Spinner /> : null}
                 Restore card
-              </button>
+              </Button>
             ) : null}
             {!readOnly && !card.archivedAt ? (
-              <button
-                type="button"
-                className="btn btn--danger"
+              <Button
+                variant="danger"
+                icon={Archive}
                 onClick={() => setConfirmDelete(true)}
               >
                 Archive
-              </button>
+              </Button>
             ) : null}
-            <span className="grow" />
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={onClose}
-            >
+            <span className="flex-1" />
+            <Button variant="primary" onClick={onClose}>
               Done
-            </button>
+            </Button>
           </>
         }
       >
-        <div className="detail-grid">
-          <div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_240px]">
+          <div className="min-w-0 space-y-6">
             <Field label="Title">
-              <input
+              <Input
                 key={`title-${card.version}`}
-                className="input"
                 defaultValue={card.title}
                 onBlur={(event) => commitTitle(event.target.value)}
                 onKeyDown={(event) => {
@@ -295,9 +301,8 @@ export function CardModal({
             </Field>
 
             <Field label="Description">
-              <textarea
+              <Textarea
                 key={`description-${card.version}`}
-                className="textarea"
                 defaultValue={card.description ?? ""}
                 onBlur={(event) => commitDescription(event.target.value)}
                 placeholder="Add a description…"
@@ -306,13 +311,13 @@ export function CardModal({
               />
             </Field>
 
-            <div className="detail-section">
-              <div className="detail-section__title">Labels</div>
-              <div className="row row--wrap">
+            <div>
+              <SectionTitle>Labels</SectionTitle>
+              <div className="flex flex-wrap items-center gap-1.5">
                 {(card.labels ?? []).map((label) => (
-                  <span key={label.id} className="row" style={{ gap: 4 }}>
+                  <span key={label.id} className="flex items-center gap-1">
                     <span
-                      className="label-chip"
+                      className="rounded-full px-2.5 py-1 text-[10.5px] font-bold text-white"
                       style={{ background: label.color }}
                     >
                       {label.name}
@@ -320,9 +325,8 @@ export function CardModal({
                     {!readOnly ? (
                       <button
                         type="button"
-                        className="btn btn--ghost btn--icon"
-                        style={{ width: 20, height: 20 }}
                         aria-label={`Remove ${label.name}`}
+                        className="cursor-pointer rounded p-0.5 text-faint hover:text-danger"
                         onClick={() =>
                           patch.mutate({
                             labels: (card.labels ?? []).filter(
@@ -331,17 +335,15 @@ export function CardModal({
                           })
                         }
                       >
-                        ×
+                        <X size={12} />
                       </button>
                     ) : null}
                   </span>
                 ))}
                 {!readOnly && (card.labels ?? []).length < 6 ? (
                   labelDraft ? (
-                    <span className="row" style={{ gap: 4 }}>
-                      <input
-                        className="input"
-                        style={{ width: 110, padding: "3px 8px" }}
+                    <span className="flex items-center gap-1.5">
+                      <Input
                         value={labelDraft.name}
                         onChange={(event) =>
                           setLabelDraft({
@@ -352,10 +354,11 @@ export function CardModal({
                         placeholder="Label"
                         autoFocus
                         maxLength={40}
+                        className="h-7 w-[110px] text-[12px]"
                       />
-                      <button
-                        type="button"
-                        className="btn btn--sm btn--primary"
+                      <Button
+                        variant="primary"
+                        size="xs"
                         disabled={!labelDraft.name.trim()}
                         onClick={() => {
                           patch.mutate({
@@ -372,19 +375,19 @@ export function CardModal({
                         }}
                       >
                         Add
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--sm"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         onClick={() => setLabelDraft(null)}
                       >
-                        ×
-                      </button>
+                        <X size={12} />
+                      </Button>
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      className="btn btn--sm"
+                    <Button
+                      size="xs"
+                      icon={Plus}
                       onClick={() =>
                         setLabelDraft({
                           name: "",
@@ -395,95 +398,107 @@ export function CardModal({
                         })
                       }
                     >
-                      + Label
-                    </button>
+                      Label
+                    </Button>
                   )
                 ) : null}
               </div>
             </div>
 
-            <div className="detail-section">
-              <div className="detail-section__title">
+            <div>
+              <SectionTitle>
                 Checklists {totalItems > 0 ? `· ${progress}%` : ""}
-              </div>
+              </SectionTitle>
               {totalItems > 0 ? (
-                <div className="progress" style={{ marginBottom: 12 }}>
-                  <div
-                    className="progress__bar"
-                    style={{ width: `${progress}%` }}
+                <div className="mb-3">
+                  <ProgressBar
+                    value={progress}
+                    tone={progress === 100 ? "ok" : "brand"}
                   />
                 </div>
               ) : null}
-              {(card.checklists ?? []).map((checklist) => (
-                <div key={checklist.id} style={{ marginBottom: 14 }}>
-                  <div className="row row--between">
-                    <strong style={{ fontSize: 13 }}>{checklist.title}</strong>
+              <div className="space-y-4">
+                {(card.checklists ?? []).map((checklist) => (
+                  <div
+                    key={checklist.id}
+                    className="rounded-lg border border-line p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <strong className="text-[12.5px] text-ink">
+                        {checklist.title}
+                      </strong>
+                      {!readOnly ? (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => removeChecklist(checklist.id)}
+                        >
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
+                    <div className="space-y-1.5">
+                      {(checklist.items ?? []).map((item) => (
+                        <label
+                          key={item.id}
+                          className={`flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1 text-[12.5px] hover:bg-sunken ${
+                            item.done ? "text-faint line-through" : "text-ink"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={item.done}
+                            disabled={readOnly || patch.isPending}
+                            onChange={() =>
+                              toggleChecklistItem(checklist.id, item.id)
+                            }
+                            className="h-3.5 w-3.5 cursor-pointer accent-[var(--brand)]"
+                          />
+                          {item.title}
+                        </label>
+                      ))}
+                    </div>
                     {!readOnly ? (
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={() => removeChecklist(checklist.id)}
-                      >
-                        Remove
-                      </button>
+                      <AddItemForm
+                        onAdd={(title) => addChecklistItem(checklist.id, title)}
+                        placeholder="Add an item"
+                      />
                     ) : null}
                   </div>
-                  {(checklist.items ?? []).map((item) => (
-                    <label
-                      key={item.id}
-                      className={`checklist__item${item.done ? " checklist__item--done" : ""}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={item.done}
-                        disabled={readOnly || patch.isPending}
-                        onChange={() =>
-                          toggleChecklistItem(checklist.id, item.id)
-                        }
-                      />
-                      <span>{item.title}</span>
-                    </label>
-                  ))}
-                  {!readOnly ? (
-                    <AddItemForm
-                      onAdd={(title) => addChecklistItem(checklist.id, title)}
-                      placeholder="Add an item"
-                    />
-                  ) : null}
-                </div>
-              ))}
-              {!readOnly ? (
-                <AddItemForm
-                  onAdd={addChecklist}
-                  placeholder="Add a checklist"
-                />
-              ) : null}
+                ))}
+                {!readOnly ? (
+                  <AddItemForm
+                    onAdd={addChecklist}
+                    placeholder="Add a checklist"
+                  />
+                ) : null}
+              </div>
             </div>
 
-            <div className="detail-section">
-              <div className="detail-section__title">
+            <div>
+              <SectionTitle>
                 Comments ({commentsQuery.data?.comments.length ?? 0})
-              </div>
-              <div className="stack" style={{ gap: 8 }}>
+              </SectionTitle>
+              <div className="space-y-3">
                 {commentsQuery.data?.comments.map((comment) => (
-                  <div key={comment.id} className="comment">
+                  <div key={comment.id} className="flex items-start gap-2.5">
                     <Avatar
                       name={
                         members.find((m) => m.userId === comment.authorId)
                           ?.name ?? comment.authorId
                       }
                     />
-                    <div className="comment__body">
-                      <div className="comment__head">
-                        <strong>
+                    <div className="min-w-0 flex-1 rounded-lg rounded-tl-none border border-line bg-sunken/50 px-3 py-2">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <strong className="text-[12px] text-ink">
                           {members.find((m) => m.userId === comment.authorId)
                             ?.name ?? "Unknown"}
                         </strong>
-                        <span>
+                        <span className="text-[10.5px] text-faint">
                           {new Date(comment.createdAt).toLocaleString()}
                         </span>
                       </div>
-                      <div style={{ whiteSpace: "pre-wrap" }}>
+                      <div className="mt-1 whitespace-pre-wrap text-[12.5px] text-ink">
                         {comment.body}
                       </div>
                     </div>
@@ -491,67 +506,62 @@ export function CardModal({
                 ))}
                 {commentsQuery.data &&
                 commentsQuery.data.comments.length === 0 ? (
-                  <p className="faint" style={{ margin: 0, fontSize: 13 }}>
+                  <p className="text-[12.5px] text-faint">
                     No comments yet. Use @handle to mention someone.
                   </p>
                 ) : null}
               </div>
               {!readOnly ? (
                 <form
-                  style={{ marginTop: 12 }}
+                  className="mt-3"
                   onSubmit={(event: FormEvent) => {
                     event.preventDefault();
                     if (commentBody.trim()) commentMutation.mutate();
                   }}
                 >
-                  <textarea
-                    className="textarea"
+                  <Textarea
                     value={commentBody}
                     onChange={(event) => setCommentBody(event.target.value)}
                     placeholder={`Comment as ${user?.name ?? "you"}…`}
                     maxLength={4000}
                   />
-                  <button
+                  <Button
                     type="submit"
-                    className="btn btn--primary btn--sm"
-                    style={{ marginTop: 8 }}
-                    disabled={commentMutation.isPending || !commentBody.trim()}
+                    variant="primary"
+                    size="sm"
+                    className="mt-2"
+                    loading={commentMutation.isPending}
+                    disabled={!commentBody.trim()}
                   >
-                    {commentMutation.isPending ? <Spinner /> : null}
                     Comment
-                  </button>
+                  </Button>
                 </form>
               ) : null}
             </div>
 
-            <div className="detail-section">
-              <div className="detail-section__title">Activity</div>
-              <div className="timeline">
+            <div>
+              <SectionTitle>Activity</SectionTitle>
+              <div className="space-y-3 border-l-2 border-line pl-4">
                 {activityQuery.data?.activities.map((entry, index) => (
-                  <div
-                    key={`${entry.createdAt}-${index}`}
-                    className="timeline__item"
-                  >
-                    <span className="timeline__dot" />
-                    <div>
-                      <div>
-                        <strong>
-                          {members.find((m) => m.userId === entry.actorId)
-                            ?.name ?? entry.actorId}
-                        </strong>{" "}
-                        <span className="muted">
-                          {entry.action.replace(/_/g, " ")}
-                        </span>
-                      </div>
-                      <div className="faint" style={{ fontSize: 12 }}>
-                        {new Date(entry.createdAt).toLocaleString()}
-                      </div>
+                  <div key={`${entry.createdAt}-${index}`} className="relative">
+                    <span className="absolute -left-[21.5px] top-1.5 h-2 w-2 rounded-full bg-line-strong" />
+                    <div className="text-[12.5px] text-ink">
+                      <strong>
+                        {members.find((m) => m.userId === entry.actorId)
+                          ?.name ?? entry.actorId}
+                      </strong>{" "}
+                      <span className="text-muted">
+                        {entry.action.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-faint">
+                      {new Date(entry.createdAt).toLocaleString()}
                     </div>
                   </div>
                 ))}
                 {activityQuery.data &&
                 activityQuery.data.activities.length === 0 ? (
-                  <p className="faint" style={{ margin: 0, fontSize: 13 }}>
+                  <p className="text-[12.5px] text-faint">
                     No activity recorded yet.
                   </p>
                 ) : null}
@@ -559,10 +569,10 @@ export function CardModal({
             </div>
           </div>
 
-          <aside className="stack">
+          <aside className="space-y-5">
             <div>
-              <div className="detail-section__title">Status</div>
-              <label className="checkbox">
+              <SectionTitle>Status</SectionTitle>
+              <label className="flex cursor-pointer items-center gap-2.5 text-[12.5px] font-semibold text-ink">
                 <input
                   type="checkbox"
                   checked={Boolean(card.completedAt)}
@@ -570,15 +580,14 @@ export function CardModal({
                   onChange={(event) =>
                     patch.mutate({ completed: event.target.checked })
                   }
+                  className="h-4 w-4 cursor-pointer accent-[var(--brand)]"
                 />
                 Completed
               </label>
             </div>
 
-            <div>
-              <div className="detail-section__title">Due date</div>
-              <input
-                className="input"
+            <Field label="Due date">
+              <Input
                 type="datetime-local"
                 value={toDateInput(card.dueAt)}
                 disabled={readOnly || patch.isPending}
@@ -590,12 +599,10 @@ export function CardModal({
                   })
                 }
               />
-            </div>
+            </Field>
 
-            <div>
-              <div className="detail-section__title">Priority</div>
-              <select
-                className="select"
+            <Field label="Priority">
+              <Select
                 value={card.priority}
                 disabled={readOnly || patch.isPending}
                 onChange={(event) =>
@@ -609,36 +616,41 @@ export function CardModal({
                     {value}
                   </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </Field>
 
             <div>
-              <div className="detail-section__title">Assignees</div>
-              <div
-                className="stack"
-                style={{ gap: 4, maxHeight: 220, overflowY: "auto" }}
-              >
+              <SectionTitle>Assignees</SectionTitle>
+              <div className="max-h-[220px] space-y-1 overflow-y-auto">
                 {members.map((member) => (
-                  <label key={member.userId} className="checkbox">
+                  <label
+                    key={member.userId}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1 text-[12.5px] text-ink hover:bg-sunken"
+                  >
                     <input
                       type="checkbox"
                       checked={(card.assignees ?? []).includes(member.userId)}
                       disabled={readOnly || patch.isPending}
                       onChange={() => toggleAssignee(member.userId)}
+                      className="h-3.5 w-3.5 cursor-pointer accent-[var(--brand)]"
                     />
-                    <Avatar name={member.name} url={member.avatarUrl} />
-                    <span>{member.name}</span>
+                    <Avatar
+                      name={member.name}
+                      url={member.avatarUrl}
+                      size="sm"
+                    />
+                    <span className="truncate">{member.name}</span>
                   </label>
                 ))}
                 {members.length === 0 ? (
-                  <span className="faint" style={{ fontSize: 12.5 }}>
+                  <span className="text-[12px] text-faint">
                     No members found.
                   </span>
                 ) : null}
               </div>
             </div>
 
-            <div className="faint" style={{ fontSize: 11.5 }}>
+            <div className="text-[11px] leading-relaxed text-faint">
               Created {new Date(card.createdAt).toLocaleDateString()}
               <br />
               Updated {new Date(card.updatedAt).toLocaleString()}
@@ -672,8 +684,7 @@ function AddItemForm({
   const [value, setValue] = useState("");
   return (
     <form
-      className="row"
-      style={{ marginTop: 6 }}
+      className="mt-2 flex items-center gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         if (!value.trim()) return;
@@ -681,17 +692,16 @@ function AddItemForm({
         setValue("");
       }}
     >
-      <input
-        className="input"
-        style={{ padding: "5px 9px" }}
+      <Input
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
         maxLength={200}
+        className="h-8 text-[12px]"
       />
-      <button type="submit" className="btn btn--sm" disabled={!value.trim()}>
+      <Button type="submit" size="sm" disabled={!value.trim()}>
         Add
-      </button>
+      </Button>
     </form>
   );
 }

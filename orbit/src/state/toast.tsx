@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 
 type ToastKind = "success" | "error" | "info";
 
@@ -30,6 +31,21 @@ export function useToast(): ToastContextValue {
   if (!value) throw new Error("useToast must be used inside <ToastProvider>");
   return value;
 }
+
+const KIND_STYLE: Record<ToastKind, { border: string; icon: ReactNode }> = {
+  success: {
+    border: "border-l-ok",
+    icon: <CheckCircle2 size={16} className="text-ok" aria-hidden />,
+  },
+  error: {
+    border: "border-l-danger",
+    icon: <AlertTriangle size={16} className="text-danger" aria-hidden />,
+  },
+  info: {
+    border: "border-l-info",
+    icon: <Info size={16} className="text-info" aria-hidden />,
+  },
+};
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -63,20 +79,36 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="toast-stack" role="status" aria-live="polite">
+      <div
+        className="pointer-events-none fixed bottom-4 right-4 z-[120] flex w-[340px] max-w-[calc(100vw-2rem)] flex-col gap-2"
+        role="status"
+        aria-live="polite"
+      >
         {toasts.map((toast) => (
-          <div key={toast.id} className={`toast toast--${toast.kind}`}>
-            <div className="toast__body">
-              <strong>{toast.title}</strong>
-              {toast.detail ? <span>{toast.detail}</span> : null}
+          <div
+            key={toast.id}
+            className={`pointer-events-auto flex items-start gap-2.5 rounded-lg border border-line border-l-[3px] bg-surface px-3.5 py-3 shadow-md animate-slide-up ${KIND_STYLE[toast.kind].border}`}
+          >
+            <span className="mt-0.5 shrink-0">
+              {KIND_STYLE[toast.kind].icon}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-bold text-ink">
+                {toast.title}
+              </div>
+              {toast.detail ? (
+                <div className="mt-0.5 text-[12px] leading-relaxed text-muted">
+                  {toast.detail}
+                </div>
+              ) : null}
             </div>
             <button
               type="button"
-              className="toast__close"
+              className="shrink-0 cursor-pointer rounded p-0.5 text-faint hover:text-ink"
               onClick={() => dismiss(toast.id)}
               aria-label="Dismiss"
             >
-              ×
+              <X size={14} />
             </button>
           </div>
         ))}

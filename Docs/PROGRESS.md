@@ -5,38 +5,38 @@ have been run. Update the status column in the same commit as the phase.
 
 **Legend:** ⬜ not started · 🟨 in progress · ✅ done · ⛔ blocked
 
-| Phase | Scope | Status | Commit | Notes |
-|---|---|---|---|---|
-| 0 | Monorepo bootstrap, config, shared package, env validation, husky | ✅ | | Bootstrap & workspaces complete |
-| 1 | Docker: Mongo replica set, dual Redis, MinIO, Nginx, MailHog | ✅ | | Docker Compose infra + Atlas fallback verified |
-| 2 | Logger, errors, Mongo/Redis clients, cluster runtime, health, metrics | ✅ | | Clustered supervisor with auto-restart implemented |
-| 3 | Auth: argon2id, JWT, rotating refresh, reuse detection, sessions | ✅ | | Implemented with token family rotation |
-| 4 | RBAC, Lua rate limiter, idempotency, validation, audit, soft delete | ✅ | | 3-layer authorization and fail-closed auth limits |
-| 5 | Workspaces: T1 bootstrap transaction, members, invites, roles | ✅ | | Bootstrap, invite and membership lifecycle |
-| 6 | Boards/lists/cards: fractional index, T2 move, filters, activity | ✅ | | O(1) DnD + T2 + C1/T3 from-message transaction |
-| 7 | Pages: nested tree, blocks, autosave conflicts, versions, backlinks, trash | ✅ | | Notion pillar: models, tree, block editor, snapshots |
-| 8 | Chat: channels, messages, threads, reactions, unread, presence | ✅ | | Slack pillar: channels, messages, threads, reactions |
-| 9 | Realtime: Socket.io gateway, permissioned rooms, Redis adapter | ✅ | | Socket.io 4 + Redis adapter + presence/typing + emitSafe |
-| 10 | Queues: 9 BullMQ queues, retries, DLQ, repeatable jobs, BullBoard | ✅ | | BullMQ 5 + 9 queues + DLQ + BullBoard /admin/queues |
-| 11 | Files (presign), search (facets), notifications (grouping), analytics | ✅ | | Presign flow + faceted search + notifications + analytics |
-| 12 | Web foundation: app shell, tokens, 60-component design system | ✅ | | App shell + tokens + command palette + error boundaries |
-| 13 | Web features: boards, docs, chat, search, notifications, settings | ✅ | | Boards, Docs, Chat, Files, Analytics, Members, Settings |
-| 14 | Web hardening: offline outbox, dark mode, error boundaries, a11y, perf | ✅ | | Multi-level error boundaries + socket realtime + network resilience |
-| 15 | Tests to 60%+ coverage, index-plan tests, k6 load tests | ✅ | | 24 shared + 8 server regressions passing, property tests |
-| 16 | Dockerfiles, migrations, seed, 5 CI workflows, observability, runbook | ✅ | | Enhanced seed (Docs+Chat+Files), sync-indexes, worker service |
-| 17 | Docs: README, architecture + ER diagrams, ADRs, API docs, demo script | ✅ | | README/RUNNING/AUDIT updated, OpenAPI generated, load tests + gallery |
-| QA | Audit against Definition of Done + 15 failure modes | ✅ | | Crash handling, auto-restart, 503 mapping, error boundaries verified |
+| Phase | Scope                                                                      | Status | Commit | Notes                                                                 |
+| ----- | -------------------------------------------------------------------------- | ------ | ------ | --------------------------------------------------------------------- |
+| 0     | Monorepo bootstrap, config, shared package, env validation, husky          | ✅     |        | Bootstrap & workspaces complete                                       |
+| 1     | Docker: Mongo replica set, dual Redis, MinIO, Nginx, MailHog               | ✅     |        | Docker Compose infra + Atlas fallback verified                        |
+| 2     | Logger, errors, Mongo/Redis clients, cluster runtime, health, metrics      | ✅     |        | Clustered supervisor with auto-restart implemented                    |
+| 3     | Auth: argon2id, JWT, rotating refresh, reuse detection, sessions           | ✅     |        | Implemented with token family rotation                                |
+| 4     | RBAC, Lua rate limiter, idempotency, validation, audit, soft delete        | ✅     |        | 3-layer authorization and fail-closed auth limits                     |
+| 5     | Workspaces: T1 bootstrap transaction, members, invites, roles              | ✅     |        | Bootstrap, invite and membership lifecycle                            |
+| 6     | Boards/lists/cards: fractional index, T2 move, filters, activity           | ✅     |        | O(1) DnD + T2 + C1/T3 from-message transaction                        |
+| 7     | Pages: nested tree, blocks, autosave conflicts, versions, backlinks, trash | ✅     |        | Notion pillar: models, tree, block editor, snapshots                  |
+| 8     | Chat: channels, messages, threads, reactions, unread, presence             | ✅     |        | Slack pillar: channels, messages, threads, reactions                  |
+| 9     | Realtime: Socket.io gateway, permissioned rooms, Redis adapter             | ✅     |        | Socket.io 4 + Redis adapter + presence/typing + emitSafe              |
+| 10    | Queues: 9 BullMQ queues, retries, DLQ, repeatable jobs, BullBoard          | ✅     |        | BullMQ 5 + 9 queues + DLQ + BullBoard /admin/queues                   |
+| 11    | Files (presign), search (facets), notifications (grouping), analytics      | ✅     |        | Presign flow + faceted search + notifications + analytics             |
+| 12    | Web foundation: app shell, tokens, 60-component design system              | ✅     |        | App shell + tokens + command palette + error boundaries               |
+| 13    | Web features: boards, docs, chat, search, notifications, settings          | ✅     |        | Boards, Docs, Chat, Files, Analytics, Members, Settings               |
+| 14    | Web hardening: offline outbox, dark mode, error boundaries, a11y, perf     | ✅     |        | Multi-level error boundaries + socket realtime + network resilience   |
+| 15    | Tests to 60%+ coverage, index-plan tests, k6 load tests                    | ✅     |        | 24 shared + 8 server regressions passing, property tests              |
+| 16    | Dockerfiles, migrations, seed, 5 CI workflows, observability, runbook      | ✅     |        | Enhanced seed (Docs+Chat+Files), sync-indexes, worker service         |
+| 17    | Docs: README, architecture + ER diagrams, ADRs, API docs, demo script      | ✅     |        | README/RUNNING/AUDIT updated, OpenAPI generated, load tests + gallery |
+| QA    | Audit against Definition of Done + 15 failure modes                        | ✅     |        | Crash handling, auto-restart, 503 mapping, error boundaries verified  |
 
 ## Milestones
 
-| Milestone | Target | Status |
-|---|---|---|
-| M1 — Stack boots (`docker compose up` → healthy) | Day 2 | ✅ |
-| M2 — Auth + RBAC + security middleware proven by tests | Day 4 | ✅ |
-| M3 — Kanban drag & drop with transactional move | Day 6 | ✅ |
-| M4 — All 40 APIs live + sockets + queues working | Day 9 | ✅ |
-| M5 — Full dashboard UI working end-to-end | Day 11 | ✅ |
-| M6 — Tests ≥60%, load-tested, docs complete, submission-ready | Day 12 | ✅ |
+| Milestone                                                     | Target | Status |
+| ------------------------------------------------------------- | ------ | ------ |
+| M1 — Stack boots (`docker compose up` → healthy)              | Day 2  | ✅     |
+| M2 — Auth + RBAC + security middleware proven by tests        | Day 4  | ✅     |
+| M3 — Kanban drag & drop with transactional move               | Day 6  | ✅     |
+| M4 — All 40 APIs live + sockets + queues working              | Day 9  | ✅     |
+| M5 — Full dashboard UI working end-to-end                     | Day 11 | ✅     |
+| M6 — Tests ≥60%, load-tested, docs complete, submission-ready | Day 12 | ✅     |
 
 ## 2026-09-24 — Final completion (Phases 12–17)
 
@@ -54,22 +54,22 @@ Remaining for prod: Playwright offline/theme/a11y, RBAC matrix + transaction rol
 
 ## Evidence collected (for the README / demo)
 
-| Artifact | Status | Location |
-|---|---|---|
-| Coverage report screenshot | ⬜ | `docs/assets/coverage.png` |
-| k6 load-test results | ⬜ | `docs/load-test-report.md` |
-| Grafana dashboard screenshot during load | ⬜ | `docs/assets/grafana.png` |
-| Bundle analysis screenshot | ⬜ | `docs/assets/bundle.png` |
-| `explain()` IXSCAN proofs | ⬜ | `docs/performance.md` |
-| BullBoard queue screenshot | ⬜ | `docs/assets/bullboard.png` |
-| Design system gallery (`/dev/components`) | ⬜ | `docs/assets/components.png` |
-| 3-minute demo recording | ⬜ | README link |
+| Artifact                                  | Status | Location                     |
+| ----------------------------------------- | ------ | ---------------------------- |
+| Coverage report screenshot                | ⬜     | `docs/assets/coverage.png`   |
+| k6 load-test results                      | ⬜     | `docs/load-test-report.md`   |
+| Grafana dashboard screenshot during load  | ⬜     | `docs/assets/grafana.png`    |
+| Bundle analysis screenshot                | ⬜     | `docs/assets/bundle.png`     |
+| `explain()` IXSCAN proofs                 | ⬜     | `docs/performance.md`        |
+| BullBoard queue screenshot                | ⬜     | `docs/assets/bullboard.png`  |
+| Design system gallery (`/dev/components`) | ⬜     | `docs/assets/components.png` |
+| 3-minute demo recording                   | ⬜     | README link                  |
 
 ## Blockers / decisions log
 
 | Date | Item | Decision / status |
-|---|---|---|
-| | | |
+| ---- | ---- | ----------------- |
+|      |      |                   |
 
 ## 2026-09-24 — Backend foundation snapshot
 
@@ -81,6 +81,7 @@ and security validation before production use. Mail, realtime and queues retain
 stub implementations. Frontend remains the initial scaffold.
 
 Verification before PR:
+
 - `npm ci --no-audit --no-fund`: passed.
 - `npm run build`: shared, API and frontend builds passed.
 - `npm run test -w shared`: 24/24 tests passed.
@@ -112,3 +113,79 @@ support. Favorites are local browser preferences, not synchronized server data.
 Board search/filtering operates on the existing board collection API response.
 Build and frontend lint pass; live authenticated browser flows still require a
 reachable database.
+
+## 2026-09-26 — UI redesign (Tailwind v4) + API/feature fixes
+
+Full frontend rebuild on a Tailwind CSS v4 design system plus server-side fixes
+found while smoke-testing every feature against a live API.
+
+### Frontend
+
+- Replaced the hand-written CSS (`index.css` tokens + `portal.css`) with
+  Tailwind v4 (`@tailwindcss/vite`): a single `@theme` token palette
+  (surface/ink/brand/status/sidebar colors, shadows, radii, animations) that
+  swaps via `data-theme`, so dark and light themes stay consistent everywhere.
+- Rewrote every route and component on one shared component library
+  (`src/components/ui.tsx`): Button, Input, Field, Segmented, Badge, Card,
+  Modal, Menu, EmptyState, ConfirmDialog, Avatar, ProgressBar, PageHeader, etc.
+  Props are now uniform (consistent `variant`/`size`/`tone` enums, lucide
+  `icon` components, `value`+`onChange` form controls). The parallel
+  gallery-only `design-system.tsx` and `portal.css` were removed; the
+  ComponentsGallery now renders the real components.
+- Files page: added drag-and-drop upload (dropzone with drag-over state,
+  paste/drop anywhere) alongside the button; fixed the upload flow to use the
+  returned relative `uploadUrl`.
+- Docs page: page tree and editor now read `page.id` (see server fix below);
+  icons render via the lucide map instead of raw text like "sparkles".
+- Auth pages: added the password-strength checklist and show/hide toggle,
+  proper validation errors, and an invite-accept flow.
+- AppShell: custom workspace switcher menu (replaces the native `<select>`),
+  real KPIs on the dashboard overview, command palette, notification drawer
+  and offline banner restyled on the design system.
+- Chat: fixed message-send cache shape; composer, channel list and threads
+  restyled. Boards: drag-and-drop kanban with optimistic moves and real board
+  stats; BoardPage/CardModal rebuilt on the design system.
+
+### Server
+
+- Added a global mongoose `toJSON`/`toObject` `id` virtual: every entity now
+  serializes `id` alongside `_id`, fixing broken links that relied on `id`
+  (docs pages, channels, boards, cards).
+- Added the missing `GET /api/v1/files` list endpoint (repository + service +
+  controller + route, `board:read` scoped to the token workspace) — the Files
+  page previously had nothing to call.
+- `GET /boards/:id` view no longer 500s: replaced the `$lookup`-with-
+  `$toString` aggregation (unsupported on some engines, returned lists without
+  `cards`) with two portable queries.
+- Default page icon changed from `'📄'` to `'file-text'` so the icon map works.
+
+### Verification (2026-09-26)
+
+- `npm run verify` (typecheck, lint, test, build): passed.
+- Live smoke against the embedded dev database: login, pages tree + page get,
+  channels, chat send, board view, analytics overview, search, members,
+  notifications, workspace create, file presign → raw upload → list (status
+  `ready`), health ready — all green.
+
+## 2026-09-26 (2) — Full-stack E2E audit, SMTP mail, login-corruption fix
+
+Strict end-to-end testing of every module through the frontend proxy
+(login, workspaces, members, invites + accept, boards, lists, cards incl.
+versioned patch/move, pages incl. blocks, chat incl. threads/reactions/read,
+files presign→raw→list→download→delete, notifications, search, analytics,
+health).
+
+- Fixed a data-corruption bug: `recordFailedLogin` used an aggregation-pipeline
+  update that the embedded dev engine stores verbatim, wiping the user document
+  after any wrong-password attempt (login then failed permanently). Replaced
+  with a portable `$inc` + conditional lock update.
+- Real SMTP email via nodemailer (`SMTP_HOST/PORT/USER/PASS/SECURE`,
+  `MAIL_FROM`): verification, password-reset and workspace-invite templates
+  render as multipart text+HTML. Verified by sending through a local SMTP sink.
+  With `SMTP_HOST` empty, dev keeps the log-only stub.
+- ChatPage: reject malformed `/chat/:channelId` params (non-ObjectId, e.g.
+  stale "undefined" URLs) so the query stays disabled and the page redirects
+  to the first channel instead of calling `/channels/undefined/messages`.
+- Theme audit: all 29 color tokens have light+dark values; every color utility
+  used in the app resolves to a design token (card cover swatches are
+  intentional fixed data colors).

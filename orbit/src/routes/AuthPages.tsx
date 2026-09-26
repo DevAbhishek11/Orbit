@@ -1,15 +1,26 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   Link,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
+import {
+  Activity,
+  Check,
+  Eye,
+  EyeOff,
+  Kanban,
+  LayoutGrid,
+  MessagesSquare,
+  Users,
+  X,
+} from "lucide-react";
 import { ApiError } from "../api/client";
 import { authApi, invitesApi } from "../api/endpoints";
+import { Button, CheckItem, ErrorBox, Field, Input } from "../components/ui";
 import { useAuth } from "../state/auth";
 import { useToast } from "../state/toast";
-import { ErrorBox, Field, Spinner } from "../components/ui";
 
 function describeError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
@@ -18,11 +29,99 @@ function describeError(err: unknown, fallback: string): string {
         err.details as { issues?: { path: string; message: string }[] }
       ).issues;
       if (issues?.length)
-        return issues.map((i) => `${i.path}: ${i.message}`).join(" · ");
+        return issues
+          .map((issue) => `${issue.path}: ${issue.message}`)
+          .join(" · ");
     }
     return err.message;
   }
   return err instanceof Error ? err.message : fallback;
+}
+
+function passwordChecks(password: string, name: string, email: string) {
+  const classes = [
+    /[a-z]/.test(password),
+    /[A-Z]/.test(password),
+    /\d/.test(password),
+    /[^a-zA-Z0-9]/.test(password),
+  ].filter(Boolean).length;
+  return [
+    { label: "At least 12 characters", ok: password.length >= 12 },
+    {
+      label: "Two character classes (a-z, A-Z, 0-9, symbols)",
+      ok: classes >= 2,
+    },
+    {
+      label: "Does not contain your name or email",
+      ok:
+        password.length > 0 &&
+        !name.toLowerCase().includes(password.toLowerCase()) &&
+        (name.length < 3 ||
+          !password.toLowerCase().includes(name.toLowerCase())) &&
+        (email.length < 3 ||
+          !password
+            .toLowerCase()
+            .includes(email.split("@")[0]?.toLowerCase() ?? "")),
+    },
+  ];
+}
+
+function PasswordField({
+  value,
+  onChange,
+  checks,
+  label = "Password",
+  autoFocus = false,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  checks?: { label: string; ok: boolean }[];
+  label?: string;
+  autoFocus?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <Field label={label}>
+      <div className="relative">
+        <Input
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          required
+          minLength={12}
+          maxLength={128}
+          autoFocus={autoFocus}
+          className="pr-10"
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((prev) => !prev)}
+          title={visible ? "Hide password" : "Show password"}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer rounded p-0.5 text-faint hover:text-ink"
+        >
+          {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+        </button>
+      </div>
+      {checks ? (
+        <div className="mt-2 space-y-1">
+          {checks.map((check) => (
+            <div key={check.label} className="flex items-center gap-1.5">
+              {check.ok ? (
+                <Check size={12} className="text-ok" aria-hidden />
+              ) : (
+                <X size={12} className="text-faint" aria-hidden />
+              )}
+              <span
+                className={`text-[11.5px] ${check.ok ? "font-semibold text-ok" : "text-faint"}`}
+              >
+                {check.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Field>
+  );
 }
 
 function AuthCard({
@@ -32,47 +131,89 @@ function AuthCard({
 }: {
   title: string;
   subtitle: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="auth-page auth-layout">
-      <section className="auth-intro">
-        <div className="brand-wordmark">
-          <span className="sidebar__logo">O</span> orbit
-          <span className="brand-dot">.</span>
-        </div>
-        <span className="eyebrow">
-          A LITTLE LESS CHAOS. A LOT MORE CLARITY.
-        </span>
-        <h1>
-          Great things start
-          <br />
-          with a shared space.
-        </h1>
-        <p>
-          Bring your team together. Organize the details.
-          <br />
-          Give your next big idea room to grow.
-        </p>
-        <div className="auth-feature-row">
-          <span>▦ Flexible boards</span>
-          <span>◍ Shared workspaces</span>
-          <span>✓ Clear priorities</span>
-        </div>
-        <Link className="status-link" to="/status">
-          ◉ Check service status ↗
-        </Link>
-      </section>
-      <div className="auth-card">
-        <div className="auth-card__brand">
-          <span className="sidebar__logo">O</span>
-          <div>
-            <div className="auth-card__title">{title}</div>
+    <div className="flex min-h-screen flex-col bg-app lg:flex-row">
+      <section className="relative hidden flex-1 overflow-hidden bg-sidebar px-12 py-14 text-sidebar-strong lg:flex lg:flex-col lg:justify-center">
+        <div
+          className="pointer-events-none absolute -right-32 -top-40 h-96 w-96 rounded-full bg-brand/25 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-info/20 blur-3xl"
+          aria-hidden
+        />
+        <div className="relative max-w-md">
+          <div className="mb-8 flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-md">
+              <Kanban size={19} aria-hidden />
+            </span>
+            <span className="text-[20px] font-extrabold tracking-tight">
+              orbit<span className="text-brand">.</span>
+            </span>
           </div>
+          <div className="mb-3 text-[10.5px] font-bold uppercase tracking-[0.22em] text-brand">
+            A little less chaos. A lot more clarity.
+          </div>
+          <h1 className="text-[30px] font-extrabold leading-tight tracking-tight">
+            Great things start
+            <br />
+            with a shared space.
+          </h1>
+          <p className="mt-4 text-[13px] leading-relaxed text-sidebar-ink">
+            Bring your team together. Organize the details. Give your next big
+            idea room to grow.
+          </p>
+          <div className="mt-8 space-y-2.5 text-[12.5px] font-semibold text-sidebar-ink">
+            <div className="flex items-center gap-2.5">
+              <LayoutGrid size={14} className="text-brand" aria-hidden />{" "}
+              Flexible boards
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Users size={14} className="text-brand" aria-hidden /> Shared
+              workspaces
+            </div>
+            <div className="flex items-center gap-2.5">
+              <MessagesSquare size={14} className="text-brand" aria-hidden />{" "}
+              Realtime chat & docs
+            </div>
+          </div>
+          <Link
+            to="/status"
+            className="mt-10 inline-flex items-center gap-1.5 text-[12px] font-semibold text-sidebar-ink hover:text-sidebar-strong"
+          >
+            <Activity size={13} className="text-brand" aria-hidden /> Check
+            service status ↗
+          </Link>
         </div>
-        <p className="auth-card__subtitle">{subtitle}</p>
-        {children}
+      </section>
+
+      <div className="flex flex-1 items-center justify-center px-5 py-10">
+        <div className="w-full max-w-[400px] rounded-2xl border border-line bg-surface p-7 shadow-md animate-slide-up">
+          <div className="mb-1.5 flex items-center gap-2.5 lg:hidden">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-orange-700 text-white">
+              <Kanban size={15} aria-hidden />
+            </span>
+            <span className="text-[16px] font-extrabold text-ink">
+              orbit<span className="text-brand">.</span>
+            </span>
+          </div>
+          <h2 className="text-[18px] font-extrabold tracking-tight text-ink">
+            {title}
+          </h2>
+          <p className="mb-5 mt-1 text-[12.5px] text-muted">{subtitle}</p>
+          {children}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function FooterLinks({ children }: { children: ReactNode }) {
+  return (
+    <div className="mt-5 text-center text-[12px] text-faint [&_a]:font-bold [&_a]:text-brand [&_a]:hover:underline">
+      {children}
     </div>
   );
 }
@@ -87,6 +228,11 @@ export function RegisterPage() {
   const [handle, setHandle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const checks = useMemo(
+    () => passwordChecks(password, name, email),
+    [password, name, email],
+  );
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -113,67 +259,59 @@ export function RegisterPage() {
       title="Create your account"
       subtitle="Docs, boards and chat in one workspace."
     >
-      {error ? <ErrorBox message={error} /> : null}
-      <form onSubmit={submit}>
+      {error ? (
+        <div className="mb-4">
+          <ErrorBox message={error} />
+        </div>
+      ) : null}
+      <form onSubmit={submit} className="space-y-4">
         <Field label="Full name">
-          <input
-            className="input"
+          <Input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(event) => setName(event.target.value)}
             required
             maxLength={120}
             autoFocus
           />
         </Field>
         <Field label="Email">
-          <input
-            className="input"
+          <Input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
             required
           />
         </Field>
-        <Field
-          label="Password"
-          hint="At least 12 characters, mixing two of: lowercase, uppercase, digits, symbols. It must not contain your name or email."
-        >
-          <input
-            className="input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={12}
-            maxLength={128}
-          />
-        </Field>
+        <PasswordField
+          value={password}
+          onChange={setPassword}
+          checks={checks}
+        />
         <Field
           label="Handle"
           hint="Optional — lowercase letters, digits and underscores."
         >
-          <input
-            className="input"
+          <Input
             value={handle}
-            onChange={(e) => setHandle(e.target.value)}
+            onChange={(event) => setHandle(event.target.value)}
             pattern="[a-z0-9_]*"
             minLength={3}
             maxLength={30}
             placeholder="auto-generated from your email"
           />
         </Field>
-        <button
-          className="btn btn--primary btn--block"
-          disabled={busy}
+        <Button
           type="submit"
+          variant="primary"
+          className="w-full"
+          loading={busy}
         >
-          {busy ? <Spinner /> : null}
           Create account
-        </button>
+        </Button>
       </form>
-      <div className="auth-card__footer">
+      <FooterLinks>
         Already have an account? <Link to="/login">Sign in</Link>
-      </div>
+      </FooterLinks>
     </AuthCard>
   );
 }
@@ -203,49 +341,45 @@ export function LoginPage() {
 
   return (
     <AuthCard title="Sign in to Orbit" subtitle="Welcome back.">
-      {error ? <ErrorBox message={error} /> : null}
-      <form onSubmit={submit}>
+      {error ? (
+        <div className="mb-4">
+          <ErrorBox message={error} />
+        </div>
+      ) : null}
+      <form onSubmit={submit} className="space-y-4">
         <Field label="Email">
-          <input
-            className="input"
+          <Input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
             required
             autoFocus
           />
         </Field>
-        <Field label="Password">
-          <input
-            className="input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </Field>
-        <label className="checkbox" style={{ marginBottom: 16 }}>
+        <PasswordField value={password} onChange={setPassword} />
+        <label className="flex cursor-pointer items-center gap-2.5 text-[12.5px] font-medium text-muted">
           <input
             type="checkbox"
             checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
+            onChange={(event) => setRemember(event.target.checked)}
+            className="h-4 w-4 cursor-pointer accent-[var(--brand)]"
           />
           Keep me signed in for 30 days
         </label>
-        <button
-          className="btn btn--primary btn--block"
-          disabled={busy}
+        <Button
           type="submit"
+          variant="primary"
+          className="w-full"
+          loading={busy}
         >
-          {busy ? <Spinner /> : null}
           Sign in
-        </button>
+        </Button>
       </form>
-      <div className="auth-card__footer">
+      <FooterLinks>
         <Link to="/forgot-password">Forgot password?</Link>
-        <span className="faint"> · </span>
+        <span className="mx-1.5">·</span>
         <Link to="/register">Create an account</Link>
-      </div>
+      </FooterLinks>
     </AuthCard>
   );
 }
@@ -280,39 +414,43 @@ export function ForgotPasswordPage() {
       title="Reset your password"
       subtitle="We will send a single-use link, valid for 30 minutes."
     >
-      {error ? <ErrorBox message={error} /> : null}
-      {sent ? (
-        <div className="info-box">
-          If an account exists for <strong>{email}</strong>, a reset link is on
-          its way. SMTP is not wired yet, so the link is also written to the API
-          server log as <code>[mail-stub]</code>.
+      {error ? (
+        <div className="mb-4">
+          <ErrorBox message={error} />
         </div>
       ) : null}
-      <form onSubmit={submit}>
+      {sent ? (
+        <div className="mb-4 rounded-lg border border-info/30 bg-info-soft px-3.5 py-2.5 text-[12px] leading-relaxed text-info">
+          If an account exists for <strong>{email}</strong>, a reset link is on
+          its way. SMTP is not wired yet, so the link is also written to the API
+          server log as{" "}
+          <code className="font-mono text-[11px]">[mail-stub]</code>.
+        </div>
+      ) : null}
+      <form onSubmit={submit} className="space-y-4">
         <Field label="Email">
-          <input
-            className="input"
+          <Input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
             required
             autoFocus
           />
         </Field>
-        <button
-          className="btn btn--primary btn--block"
-          disabled={busy}
+        <Button
           type="submit"
+          variant="primary"
+          className="w-full"
+          loading={busy}
         >
-          {busy ? <Spinner /> : null}
           Send reset link
-        </button>
+        </Button>
       </form>
-      <div className="auth-card__footer">
+      <FooterLinks>
         Have the token already? <Link to="/reset-password">Enter it</Link>
-        <span className="faint"> · </span>
+        <span className="mx-1.5">·</span>
         <Link to="/login">Back to sign in</Link>
-      </div>
+      </FooterLinks>
     </AuthCard>
   );
 }
@@ -325,6 +463,8 @@ export function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const checks = useMemo(() => passwordChecks(password, "", ""), [password]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -346,43 +486,39 @@ export function ResetPasswordPage() {
       title="Choose a new password"
       subtitle="Resetting signs out every other session."
     >
-      {error ? <ErrorBox message={error} /> : null}
-      <form onSubmit={submit}>
+      {error ? (
+        <div className="mb-4">
+          <ErrorBox message={error} />
+        </div>
+      ) : null}
+      <form onSubmit={submit} className="space-y-4">
         <Field label="Reset token" hint="From the reset link.">
-          <input
-            className="input mono"
+          <Input
             value={token}
-            onChange={(e) => setToken(e.target.value)}
+            onChange={(event) => setToken(event.target.value)}
             required
             minLength={20}
+            className="font-mono"
           />
         </Field>
-        <Field
+        <PasswordField
+          value={password}
+          onChange={setPassword}
+          checks={checks}
           label="New password"
-          hint="At least 12 characters, mixing two character classes."
-        >
-          <input
-            className="input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={12}
-            maxLength={128}
-          />
-        </Field>
-        <button
-          className="btn btn--primary btn--block"
-          disabled={busy}
+        />
+        <Button
           type="submit"
+          variant="primary"
+          className="w-full"
+          loading={busy}
         >
-          {busy ? <Spinner /> : null}
           Update password
-        </button>
+        </Button>
       </form>
-      <div className="auth-card__footer">
+      <FooterLinks>
         <Link to="/login">Back to sign in</Link>
-      </div>
+      </FooterLinks>
     </AuthCard>
   );
 }
@@ -414,30 +550,38 @@ export function VerifyEmailPage() {
       title="Verify your email"
       subtitle="Paste the token from your verification link."
     >
-      {state === "error" ? <ErrorBox message={message} /> : null}
-      {state === "ok" ? <div className="info-box">{message}</div> : null}
-      <form onSubmit={submit}>
+      {state === "error" ? (
+        <div className="mb-4">
+          <ErrorBox message={message} />
+        </div>
+      ) : null}
+      {state === "ok" ? (
+        <div className="mb-4 rounded-lg border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-[12.5px] font-semibold text-ok">
+          <CheckItem ok>{message}</CheckItem>
+        </div>
+      ) : null}
+      <form onSubmit={submit} className="space-y-4">
         <Field label="Verification token">
-          <input
-            className="input mono"
+          <Input
             value={token}
-            onChange={(e) => setToken(e.target.value)}
+            onChange={(event) => setToken(event.target.value)}
             required
             minLength={20}
+            className="font-mono"
           />
         </Field>
-        <button
-          className="btn btn--primary btn--block"
-          disabled={busy}
+        <Button
           type="submit"
+          variant="primary"
+          className="w-full"
+          loading={busy}
         >
-          {busy ? <Spinner /> : null}
           Verify email
-        </button>
+        </Button>
       </form>
-      <div className="auth-card__footer">
+      <FooterLinks>
         <Link to="/login">Back to sign in</Link>
-      </div>
+      </FooterLinks>
     </AuthCard>
   );
 }
@@ -488,37 +632,45 @@ export function InvitePage() {
       title="Workspace invitation"
       subtitle="Accept to join the workspace and pick up your role."
     >
-      {error ? <ErrorBox message={error} /> : null}
+      {error ? (
+        <div className="mb-4">
+          <ErrorBox message={error} />
+        </div>
+      ) : null}
       {!token ? (
-        <Field label="Invite token" hint="From your invitation link.">
-          <input
-            className="input mono"
-            value={manualToken}
-            onChange={(e) => setManualToken(e.target.value)}
-            minLength={20}
-          />
-        </Field>
+        <div className="mb-4">
+          <Field label="Invite token" hint="From your invitation link.">
+            <Input
+              value={manualToken}
+              onChange={(event) => setManualToken(event.target.value)}
+              minLength={20}
+              className="font-mono"
+            />
+          </Field>
+        </div>
       ) : (
-        <div className="info-box">
-          Token <code>{token.slice(0, 10)}…</code>
+        <div className="mb-4 rounded-lg border border-line bg-sunken px-3.5 py-2.5 text-[12px] text-muted">
+          Token{" "}
+          <code className="font-mono text-[11px]">{token.slice(0, 10)}…</code>
         </div>
       )}
-      <div className="row" style={{ gap: 8 }}>
-        <button
-          className="btn btn--primary grow"
-          disabled={busy || !activeToken}
-          onClick={() => accept(activeToken)}
+      <div className="flex items-center gap-2">
+        <Button
+          variant="primary"
+          className="flex-1"
+          loading={busy}
+          disabled={!activeToken}
+          onClick={() => void accept(activeToken)}
         >
-          {busy ? <Spinner /> : null}
           Accept invite
-        </button>
-        <button
-          className="btn"
-          disabled={busy || !activeToken}
-          onClick={() => decline(activeToken)}
+        </Button>
+        <Button
+          loading={busy}
+          disabled={!activeToken}
+          onClick={() => void decline(activeToken)}
         >
           Decline
-        </button>
+        </Button>
       </div>
     </AuthCard>
   );

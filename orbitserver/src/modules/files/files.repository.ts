@@ -9,6 +9,16 @@ export async function findFileByIdScoped(id: string, workspaceId: string): Promi
   return FileModel.findOne({ _id: id, workspaceId }).exec();
 }
 
+export async function findFilesByWorkspace(workspaceId: string): Promise<FileDoc[]> {
+  return FileModel.find({
+    workspaceId,
+    status: { $in: ['pending', 'ready', 'quarantined'] },
+  })
+    .sort({ createdAt: -1 })
+    .limit(500)
+    .exec();
+}
+
 export async function findFilesByEntity(
   workspaceId: string,
   entityType: string,

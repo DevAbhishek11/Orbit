@@ -79,7 +79,7 @@ const PageSchema = new Schema<PageDoc>(
   {
     workspaceId: { type: String, required: true, index: true },
     title: { type: String, required: true, trim: true, maxlength: CONTENT.PAGE_TITLE_MAX },
-    icon: { type: String, default: '📄' },
+    icon: { type: String, default: 'file-text' },
     cover: { type: String, default: null },
     parentId: { type: String, default: null, index: true },
     ancestors: [{ type: String }],

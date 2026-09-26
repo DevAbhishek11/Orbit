@@ -49,7 +49,7 @@ export async function createPage(
   const page = await repo.createPage({
     workspaceId,
     title: input.title,
-    icon: input.icon ?? '📄',
+    icon: input.icon ?? 'file-text',
     cover: input.cover ?? null,
     parentId: input.parentId ?? null,
     ancestors,

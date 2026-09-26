@@ -1,27 +1,55 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Hash,
+  Lock,
+  MessageSquare,
+  Plus,
+  Send,
+  SmilePlus,
+  User,
+  X,
+  Kanban,
+} from "lucide-react";
 import { boardsApi, chatApi } from "../api/endpoints";
 import { request } from "../api/client";
 import type { Channel, Message } from "../api/types";
-import { useAuth } from "../state/auth";
-import { useToast } from "../state/toast";
-import { useSocket } from "../state/socket";
 import {
   Avatar,
   Badge,
+  Button,
   CenterState,
   EmptyState,
   Field,
+  Input,
   Modal,
-  Spinner,
+  Select,
 } from "../components/ui";
+import { useAuth } from "../state/auth";
+import { useSocket } from "../state/socket";
+import { useToast } from "../state/toast";
 
 const EMOJI_OPTIONS = ["👍", "❤️", "🚀", "👀", "🎉", "🔥"];
 
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+
+function ChannelGlyph({ type, size = 14 }: { type: string; size?: number }) {
+  if (type === "dm") return <User size={size} aria-hidden />;
+  if (type === "private") return <Lock size={size} aria-hidden />;
+  return <Hash size={size} aria-hidden />;
+}
+
 export function ChatPage() {
   const { workspaceId, user, role } = useAuth();
-  const { channelId } = useParams();
+  const { channelId: rawChannelId } = useParams();
+  // Ignore malformed params (e.g. a stale "/chat/undefined" URL) so queries
+  // stay disabled and the redirect effect picks the first channel instead.
+  const channelId = useMemo(
+    () =>
+      rawChannelId && OBJECT_ID.test(rawChannelId) ? rawChannelId : undefined,
+    [rawChannelId],
+  );
   const queryClient = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
@@ -82,21 +110,18 @@ export function ChatPage() {
     void joinRoom(room).catch(() => undefined);
 
     const onMessageNew = (payload: { message: Message }) => {
-      if (payload.message) {
-        queryClient.setQueryData<{ messages: Message[] }>(
-          ["messages", channelId],
-          (prev) => {
-            const msgs = prev?.messages ?? [];
-
-            if (msgs.some((m) => m.id === payload.message.id))
-              return prev as never;
-            return { messages: [...msgs, payload.message] } as never;
-          },
-        );
-        void queryClient.invalidateQueries({
-          queryKey: ["channels", workspaceId],
-        });
-      }
+      if (!payload.message) return;
+      queryClient.setQueryData<{ messages: Message[] }>(
+        ["messages", channelId],
+        (prev) => {
+          const list = prev?.messages ?? [];
+          if (list.some((m) => m.id === payload.message.id)) return prev;
+          return { messages: [...list, payload.message] };
+        },
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["channels", workspaceId],
+      });
     };
 
     const onTypingStart = (data: { userId: string }) => {
@@ -106,29 +131,27 @@ export function ChatPage() {
         );
       }
     };
-
     const onTypingStop = (data: { userId: string }) => {
       setTypingUsers((prev) => prev.filter((id) => id !== data.userId));
     };
-
-    const onReaction = () => {
+    const onRefresh = () => {
       void queryClient.invalidateQueries({ queryKey: ["messages", channelId] });
     };
 
     socket.on("message:new", onMessageNew);
     socket.on("typing:start", onTypingStart);
     socket.on("typing:stop", onTypingStop);
-    socket.on("reaction:updated", onReaction);
-    socket.on("message:updated", onReaction);
-    socket.on("message:deleted", onReaction);
+    socket.on("reaction:updated", onRefresh);
+    socket.on("message:updated", onRefresh);
+    socket.on("message:deleted", onRefresh);
 
     return () => {
       socket.off("message:new", onMessageNew);
       socket.off("typing:start", onTypingStart);
       socket.off("typing:stop", onTypingStop);
-      socket.off("reaction:updated", onReaction);
-      socket.off("message:updated", onReaction);
-      socket.off("message:deleted", onReaction);
+      socket.off("reaction:updated", onRefresh);
+      socket.off("message:updated", onRefresh);
+      socket.off("message:deleted", onRefresh);
       void leaveRoom(room).catch(() => undefined);
     };
   }, [
@@ -166,10 +189,12 @@ export function ChatPage() {
       chatApi.sendMessage(channelId as string, { body }),
     onSuccess: (res) => {
       setMessageText("");
-      queryClient.setQueryData<Message[]>(["messages", channelId], (prev) => [
-        ...(prev ?? []),
-        res.message,
-      ]);
+      queryClient.setQueryData<{ messages: Message[] }>(
+        ["messages", channelId],
+        (prev) => ({
+          messages: [...(prev?.messages ?? []), res.message],
+        }),
+      );
       void queryClient.invalidateQueries({
         queryKey: ["channels", workspaceId],
       });
@@ -196,250 +221,181 @@ export function ChatPage() {
       const firstBoard = boardsRes.boards[0];
       if (!firstBoard)
         throw new Error("No board available — create a board first");
-      const res = await request<{ id: string; title: string }>(
-        "/cards/from-message",
-        {
-          method: "POST",
-          body: { messageId, boardId: firstBoard.id },
-        },
-      );
-      return res;
+      return request<{ id: string; title: string }>("/cards/from-message", {
+        method: "POST",
+        body: { messageId, boardId: firstBoard.id },
+      });
     },
-    onSuccess: () => {
-      toast.success("Card created from message");
-    },
+    onSuccess: () => toast.success("Card created from message"),
     onError: (err: Error) => toast.error("Could not create card", err.message),
   });
 
-  const handleSend = (e: FormEvent) => {
-    e.preventDefault();
+  const handleSend = (event: FormEvent) => {
+    event.preventDefault();
     if (!messageText.trim() || sendMutation.isPending) return;
     sendMutation.mutate(messageText.trim());
   };
 
   return (
-    <div
-      className="chat-layout"
-      style={{ display: "flex", height: "calc(100vh - 56px)" }}
-    >
-      {}
-      <aside
-        className="chat-sidebar"
-        style={{
-          width: 260,
-          borderRight: "1px solid var(--border)",
-          padding: "16px 12px",
-          display: "flex",
-          flexDirection: "column",
-          background: "var(--surface-muted, var(--surface))",
-          overflowY: "auto",
-        }}
-      >
-        <div className="row row--between" style={{ marginBottom: 12 }}>
-          <strong
-            style={{
-              fontSize: 13,
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
+    <div className="flex h-[calc(100vh-56px)]">
+      <aside className="flex w-[248px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface/60 p-3">
+        <div className="mb-2 flex items-center justify-between px-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">
             Channels
-          </strong>
-          {!readOnly && (
-            <button
-              type="button"
-              className="btn btn--ghost btn--icon"
-              title="New Channel"
+          </span>
+          {!readOnly ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title="New channel"
               onClick={() => setCreateChannelOpen(true)}
             >
-              +
-            </button>
-          )}
+              <Plus size={14} />
+            </Button>
+          ) : null}
         </div>
 
-        {channelsQuery.isLoading && <Spinner />}
+        {channelsQuery.isLoading ? (
+          <CenterState>Loading channels…</CenterState>
+        ) : null}
 
-        <nav className="stack" style={{ gap: 2 }}>
-          {channels.map((c: Channel) => {
-            const isSelected = c.id === channelId;
+        <nav className="space-y-0.5">
+          {channels.map((channel: Channel) => {
+            const isSelected = channel.id === channelId;
             return (
               <button
-                key={c.id}
+                key={channel.id}
                 type="button"
-                className="btn btn--ghost row row--between"
-                style={{
-                  textAlign: "left",
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  fontWeight: c.unread ? 700 : isSelected ? 600 : 400,
-                  background: isSelected
-                    ? "var(--accent-subtle)"
-                    : "transparent",
-                }}
-                onClick={() => navigate(`/chat/${c.id}`)}
+                onClick={() => navigate(`/chat/${channel.id}`)}
+                className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors ${
+                  isSelected
+                    ? "bg-brand-soft font-bold text-brand"
+                    : channel.unread
+                      ? "font-bold text-ink hover:bg-sunken"
+                      : "font-medium text-muted hover:bg-sunken hover:text-ink"
+                }`}
               >
-                <span
-                  className="row"
-                  style={{
-                    gap: 6,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  <span className="faint">
-                    {c.type === "dm" ? "👤" : c.type === "private" ? "🔒" : "#"}
-                  </span>
-                  <span>{c.name}</span>
+                <span className={isSelected ? "text-brand" : "text-faint"}>
+                  <ChannelGlyph type={channel.type} />
                 </span>
-                {c.unread && <Badge tone="accent">new</Badge>}
+                <span className="min-w-0 flex-1 truncate">{channel.name}</span>
+                {channel.unread ? <Badge tone="brand">new</Badge> : null}
               </button>
             );
           })}
-          {channels.length === 0 && !channelsQuery.isLoading && (
-            <p className="faint" style={{ fontSize: 12.5, margin: "12px 0" }}>
-              No channels yet.
-            </p>
-          )}
+          {channels.length === 0 && !channelsQuery.isLoading ? (
+            <p className="px-2 py-3 text-[12px] text-faint">No channels yet.</p>
+          ) : null}
         </nav>
       </aside>
 
-      {}
-      <main
-        className="chat-main grow"
-        style={{ display: "flex", flexDirection: "column" }}
-      >
-        {}
-        {activeChannel && (
-          <header
-            className="row row--between"
-            style={{
-              padding: "12px 24px",
-              borderBottom: "1px solid var(--border)",
-              background: "var(--surface)",
-            }}
-          >
-            <div>
-              <div className="row" style={{ gap: 8 }}>
-                <strong>
-                  {activeChannel.type === "dm"
-                    ? "👤"
-                    : activeChannel.type === "private"
-                      ? "🔒"
-                      : "#"}{" "}
+      <main className="flex min-w-0 flex-1 flex-col">
+        {activeChannel ? (
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-5 py-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-brand">
+                  <ChannelGlyph type={activeChannel.type} size={15} />
+                </span>
+                <strong className="truncate text-[13.5px] text-ink">
                   {activeChannel.name}
                 </strong>
-                <Badge tone="default">{activeChannel.type}</Badge>
+                <Badge>{activeChannel.type}</Badge>
               </div>
-              {activeChannel.topic && (
-                <div className="faint" style={{ fontSize: 12 }}>
+              {activeChannel.topic ? (
+                <div className="mt-0.5 truncate text-[11.5px] text-faint">
                   {activeChannel.topic}
                 </div>
-              )}
+              ) : null}
             </div>
           </header>
-        )}
+        ) : null}
 
-        {}
-        <div
-          className="grow"
-          style={{ overflowY: "auto", padding: "16px 24px" }}
-        >
-          {messagesQuery.isLoading && (
-            <CenterState>
-              <Spinner large />
-              <div>Loading messages…</div>
-            </CenterState>
-          )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {messagesQuery.isLoading ? (
+            <CenterState>Loading messages…</CenterState>
+          ) : null}
 
-          {!channelId && channels.length === 0 && (
+          {!channelId && channels.length === 0 ? (
             <EmptyState
-              icon="💬"
+              icon={MessageSquare}
               title="Team Chat"
               hint="Realtime channels, direct messages, and threaded conversations."
               action={
-                <button
-                  type="button"
-                  className="btn btn--primary"
+                <Button
+                  variant="primary"
+                  icon={Plus}
                   onClick={() => setCreateChannelOpen(true)}
                 >
-                  + Create Channel
-                </button>
+                  Create Channel
+                </Button>
               }
             />
-          )}
+          ) : null}
 
-          <div className="stack" style={{ gap: 16 }}>
-            {messages.map((m: Message) => (
+          <div className="space-y-4">
+            {messages.map((message: Message) => (
               <div
-                key={m.id || m._id}
-                className="message-row row"
-                style={{ gap: 12, alignItems: "flex-start" }}
+                key={message.id || message._id}
+                className="group flex items-start gap-3"
               >
-                <Avatar name={m.authorId} />
-                <div className="grow">
-                  <div className="row" style={{ gap: 8, marginBottom: 2 }}>
-                    <strong style={{ fontSize: 13 }}>{m.authorId}</strong>
-                    <span className="faint" style={{ fontSize: 11.5 }}>
-                      {new Date(m.createdAt).toLocaleTimeString([], {
+                <Avatar name={message.authorId} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <strong className="text-[12.5px] text-ink">
+                      {message.authorId}
+                    </strong>
+                    <span className="text-[11px] text-faint">
+                      {new Date(message.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
                     </span>
-                    {m.editedAt && (
-                      <span className="faint" style={{ fontSize: 10 }}>
-                        (edited)
-                      </span>
-                    )}
+                    {message.editedAt ? (
+                      <span className="text-[10px] text-faint">(edited)</span>
+                    ) : null}
                   </div>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      whiteSpace: "pre-wrap",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {m.body}
+                  <div className="mt-0.5 whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">
+                    {message.body}
                   </div>
 
-                  {}
-                  <div
-                    className="row row--wrap"
-                    style={{ gap: 4, marginTop: 6 }}
-                  >
-                    {(m.reactions ?? []).map((rx) => {
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    {(message.reactions ?? []).map((reaction) => {
                       const hasReacted = user
-                        ? rx.userIds.includes(user.id)
+                        ? reaction.userIds.includes(user.id)
                         : false;
                       return (
                         <button
-                          key={rx.emoji}
+                          key={reaction.emoji}
                           type="button"
-                          className={`btn btn--sm ${hasReacted ? "btn--primary" : "btn--ghost"}`}
-                          style={{ padding: "2px 6px", fontSize: 12 }}
                           onClick={() =>
                             reactionMutation.mutate({
-                              messageId: m.id || m._id!,
-                              emoji: rx.emoji,
+                              messageId: message.id || message._id!,
+                              emoji: reaction.emoji,
                             })
                           }
+                          className={`cursor-pointer rounded-full border px-2 py-0.5 text-[11.5px] font-semibold transition-colors ${
+                            hasReacted
+                              ? "border-brand/40 bg-brand-soft text-brand"
+                              : "border-line bg-surface text-muted hover:border-line-strong"
+                          }`}
                         >
-                          {rx.emoji} {rx.userIds.length}
+                          {reaction.emoji} {reaction.userIds.length}
                         </button>
                       );
                     })}
 
-                    {}
-                    {!readOnly && (
-                      <div className="row" style={{ gap: 2, opacity: 0.6 }}>
+                    {!readOnly ? (
+                      <span className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                         {EMOJI_OPTIONS.slice(0, 3).map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
-                            className="btn btn--ghost btn--icon"
-                            style={{ width: 22, height: 22, fontSize: 11 }}
+                            title={`React ${emoji}`}
+                            className="cursor-pointer rounded-md p-1 text-[12px] hover:bg-sunken"
                             onClick={() =>
                               reactionMutation.mutate({
-                                messageId: m.id || m._id!,
+                                messageId: message.id || message._id!,
                                 emoji,
                               })
                             }
@@ -447,105 +403,127 @@ export function ChatPage() {
                             {emoji}
                           </button>
                         ))}
-                      </div>
-                    )}
+                      </span>
+                    ) : null}
 
-                    {}
                     <button
                       type="button"
-                      className="btn btn--ghost btn--sm"
-                      style={{ fontSize: 12, marginLeft: 8 }}
-                      onClick={() => setActiveThreadMessage(m)}
+                      className="ml-1 cursor-pointer rounded-md px-2 py-0.5 text-[11.5px] font-semibold text-muted hover:bg-sunken hover:text-ink"
+                      onClick={() => setActiveThreadMessage(message)}
                     >
-                      💬{" "}
-                      {m.replyCount > 0
-                        ? `${m.replyCount} replies`
+                      <MessageSquare
+                        size={11}
+                        className="mr-1 inline"
+                        aria-hidden
+                      />
+                      {message.replyCount > 0
+                        ? `${message.replyCount} replies`
                         : "Reply in thread"}
                     </button>
 
-                    {}
-                    {!readOnly && (
+                    {!readOnly ? (
                       <button
                         type="button"
-                        className="btn btn--ghost btn--sm"
-                        style={{ fontSize: 12, marginLeft: 4 }}
+                        title="Create Kanban card from this message"
                         disabled={cardFromMessageMutation.isPending}
+                        className="cursor-pointer rounded-md px-2 py-0.5 text-[11.5px] font-semibold text-muted hover:bg-sunken hover:text-ink disabled:opacity-50"
                         onClick={() =>
                           cardFromMessageMutation.mutate({
-                            messageId: m.id || m._id!,
+                            messageId: message.id || message._id!,
                           })
                         }
-                        title="Create Kanban card from this message"
                       >
-                        ▦ Create card
+                        <Kanban size={11} className="mr-1 inline" aria-hidden />
+                        Create card
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>
             ))}
-            {typingUsers.length > 0 && (
-              <div
-                className="faint"
-                style={{ fontSize: 12, fontStyle: "italic", marginTop: 12 }}
-              >
+
+            {typingUsers.length > 0 ? (
+              <div className="text-[11.5px] italic text-faint">
                 {typingUsers.join(", ")}{" "}
                 {typingUsers.length === 1 ? "is" : "are"} typing…
               </div>
-            )}
+            ) : null}
             <div ref={messagesEndRef} />
           </div>
         </div>
 
-        {}
-        {channelId && !readOnly && (
+        {channelId && !readOnly ? (
           <form
             onSubmit={handleSend}
-            style={{
-              padding: "12px 24px",
-              borderTop: "1px solid var(--border)",
-              background: "var(--surface)",
-            }}
+            className="shrink-0 border-t border-line bg-surface px-5 py-3"
           >
-            <div className="row" style={{ gap: 8 }}>
-              <input
-                className="input grow"
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder={`Message #${activeChannel?.name ?? "channel"} (Enter to send)`}
-                autoFocus
-              />
-              <button
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Input
+                  value={messageText}
+                  onChange={(event) => setMessageText(event.target.value)}
+                  placeholder={`Message #${activeChannel?.name ?? "channel"} (Enter to send)`}
+                  className="pr-10"
+                />
+                <span
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-faint"
+                  title="Emoji reactions available on messages"
+                >
+                  <SmilePlus size={15} aria-hidden />
+                </span>
+              </div>
+              <Button
                 type="submit"
-                className="btn btn--primary"
-                disabled={!messageText.trim() || sendMutation.isPending}
+                variant="primary"
+                icon={Send}
+                disabled={!messageText.trim()}
+                loading={sendMutation.isPending}
               >
-                {sendMutation.isPending ? <Spinner /> : "Send"}
-              </button>
+                Send
+              </Button>
             </div>
           </form>
-        )}
+        ) : null}
       </main>
 
-      {}
-      {activeThreadMessage && (
+      {activeThreadMessage ? (
         <ThreadPanel
           channelId={channelId!}
           message={activeThreadMessage}
           onClose={() => setActiveThreadMessage(null)}
         />
-      )}
+      ) : null}
 
-      {}
-      {createChannelOpen && (
+      {createChannelOpen ? (
         <Modal
           title="Create Channel"
           onClose={() => setCreateChannelOpen(false)}
-          wide={false}
+          size="sm"
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => setCreateChannelOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                form="create-channel-form"
+                disabled={!newChannelName.trim()}
+                loading={createChannelMutation.isPending}
+              >
+                Create Channel
+              </Button>
+            </>
+          }
         >
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
+            id="create-channel-form"
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
               if (newChannelName.trim()) {
                 createChannelMutation.mutate({
                   name: newChannelName.trim(),
@@ -554,66 +532,39 @@ export function ChatPage() {
                 });
               }
             }}
-            className="stack"
-            style={{ gap: 12 }}
           >
-            <Field label="Channel Name">
-              <input
-                className="input"
+            <Field label="Channel name">
+              <Input
                 autoFocus
                 value={newChannelName}
-                onChange={(e) => setNewChannelName(e.target.value)}
-                placeholder="e.g. general, announcements, or project-x"
+                onChange={(event) => setNewChannelName(event.target.value)}
+                placeholder="e.g. general, announcements, project-x"
               />
             </Field>
             <Field label="Topic">
-              <input
-                className="input"
+              <Input
                 value={newChannelTopic}
-                onChange={(e) => setNewChannelTopic(e.target.value)}
+                onChange={(event) => setNewChannelTopic(event.target.value)}
                 placeholder="What is this channel about?"
               />
             </Field>
-            <Field label="Channel Type">
-              <select
-                className="select"
+            <Field label="Channel type">
+              <Select
                 value={newChannelType}
-                onChange={(e) =>
+                onChange={(event) =>
                   setNewChannelType(
-                    e.target.value as "public" | "private" | "dm",
+                    event.target.value as "public" | "private" | "dm",
                   )
                 }
               >
                 <option value="public">Public (anyone in workspace)</option>
                 <option value="private">Private (invite-only)</option>
                 <option value="dm">Direct Message</option>
-              </select>
+              </Select>
             </Field>
-            <div className="row row--end" style={{ gap: 8, marginTop: 12 }}>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setCreateChannelOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn--primary"
-                disabled={
-                  !newChannelName.trim() || createChannelMutation.isPending
-                }
-              >
-                {createChannelMutation.isPending ? (
-                  <Spinner />
-                ) : (
-                  "Create Channel"
-                )}
-              </button>
-            </div>
           </form>
         </Modal>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -655,96 +606,80 @@ function ThreadPanel({
   const replies = threadQuery.data?.replies ?? [];
 
   return (
-    <aside
-      className="thread-panel"
-      style={{
-        width: 320,
-        borderLeft: "1px solid var(--border)",
-        display: "flex",
-        flexDirection: "column",
-        background: "var(--surface)",
-      }}
-    >
-      <div
-        className="row row--between"
-        style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <strong>Thread</strong>
-        <button
-          type="button"
-          className="btn btn--ghost btn--icon"
+    <aside className="flex w-[320px] shrink-0 flex-col border-l border-line bg-surface animate-slide-left">
+      <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
+        <strong className="text-[13px] text-ink">Thread</strong>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={onClose}
+          aria-label="Close thread"
         >
-          ×
-        </button>
+          <X size={14} />
+        </Button>
       </div>
 
-      <div className="grow" style={{ overflowY: "auto", padding: "16px" }}>
-        {}
-        <div
-          className="panel"
-          style={{ padding: "10px 12px", marginBottom: 16 }}
-        >
-          <strong style={{ fontSize: 13 }}>{message.authorId}</strong>
-          <div style={{ fontSize: 13.5, marginTop: 4 }}>{message.body}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="mb-4 rounded-lg border border-line bg-sunken/60 px-3 py-2.5">
+          <strong className="text-[12px] text-ink">{message.authorId}</strong>
+          <div className="mt-1 text-[12.5px] text-muted">{message.body}</div>
         </div>
 
-        {}
-        <div className="stack" style={{ gap: 12 }}>
+        <div className="space-y-3">
           {replies.map((reply: Message) => (
             <div
               key={reply.id || reply._id}
-              className="row"
-              style={{ gap: 8, alignItems: "flex-start" }}
+              className="flex items-start gap-2.5"
             >
               <Avatar name={reply.authorId} size="sm" />
-              <div>
-                <div className="row" style={{ gap: 6 }}>
-                  <strong style={{ fontSize: 12 }}>{reply.authorId}</strong>
-                  <span className="faint" style={{ fontSize: 10 }}>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1.5">
+                  <strong className="text-[11.5px] text-ink">
+                    {reply.authorId}
+                  </strong>
+                  <span className="text-[10px] text-faint">
                     {new Date(reply.createdAt).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
                   </span>
                 </div>
-                <div style={{ fontSize: 13, marginTop: 2 }}>{reply.body}</div>
+                <div className="mt-0.5 text-[12.5px] text-ink">
+                  {reply.body}
+                </div>
               </div>
             </div>
           ))}
-          {replies.length === 0 && !threadQuery.isLoading && (
-            <p className="faint" style={{ fontSize: 12.5 }}>
+          {replies.length === 0 && !threadQuery.isLoading ? (
+            <p className="text-[12px] text-faint">
               No replies yet. Start the conversation.
             </p>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {}
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           if (replyText.trim()) replyMutation.mutate(replyText.trim());
         }}
-        style={{ padding: "12px 16px", borderTop: "1px solid var(--border)" }}
+        className="shrink-0 border-t border-line p-3"
       >
-        <div className="row" style={{ gap: 6 }}>
-          <input
-            className="input grow"
+        <div className="flex items-center gap-2">
+          <Input
             value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Reply in thread..."
+            onChange={(event) => setReplyText(event.target.value)}
+            placeholder="Reply in thread…"
           />
-          <button
+          <Button
             type="submit"
-            className="btn btn--primary btn--sm"
-            disabled={!replyText.trim() || replyMutation.isPending}
+            variant="primary"
+            size="sm"
+            disabled={!replyText.trim()}
+            loading={replyMutation.isPending}
           >
             Reply
-          </button>
+          </Button>
         </div>
       </form>
     </aside>

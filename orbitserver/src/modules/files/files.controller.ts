@@ -25,6 +25,23 @@ export async function presign(req: Request, res: Response): Promise<void> {
   });
 }
 
+export async function listFiles(req: Request, res: Response): Promise<void> {
+  const auth = requireAuth(req);
+  const files = await service.listFiles(auth.workspaceId!);
+  ok(res, {
+    files: files.map((file) => ({
+      id: file._id.toString(),
+      fileName: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      status: file.status,
+      s3Key: file.s3Key,
+      uploadedBy: file.uploadedBy,
+      createdAt: file.createdAt,
+    })),
+  });
+}
+
 export async function confirm(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
   const body = req.body as ConfirmInput;

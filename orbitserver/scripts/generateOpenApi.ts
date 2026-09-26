@@ -89,7 +89,14 @@ function buildSkeleton(): OpenApiDoc {
       tag: 'analytics',
       summary: 'Analytics overview',
     },
+    { method: 'get', path: '/api/v1/files', tag: 'files', summary: 'List workspace files' },
     { method: 'post', path: '/api/v1/files/presign', tag: 'files', summary: 'Presign upload' },
+    {
+      method: 'post',
+      path: '/api/v1/files/{fileId}/raw',
+      tag: 'files',
+      summary: 'Upload file bytes (streaming)',
+    },
     {
       method: 'get',
       path: '/api/v1/notifications',

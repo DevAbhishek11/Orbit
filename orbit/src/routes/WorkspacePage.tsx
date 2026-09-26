@@ -1,21 +1,27 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Settings2, ShieldAlert, Trash2 } from "lucide-react";
 import { ApiError } from "../api/client";
 import { workspacesApi } from "../api/endpoints";
 import type { WorkspaceDetail } from "../api/types";
-import { useAuth } from "../state/auth";
-import { useToast } from "../state/toast";
 import {
   Badge,
+  Button,
+  Card,
+  CardHeader,
   CenterState,
   ConfirmDialog,
   EmptyState,
   ErrorBox,
   Field,
+  Input,
   Modal,
-  Spinner,
+  PageHeader,
+  Select,
 } from "../components/ui";
+import { useAuth } from "../state/auth";
+import { useToast } from "../state/toast";
 
 export function WorkspacePage() {
   const { workspaceId, role, user, refreshWorkspaces, selectWorkspace } =
@@ -85,13 +91,11 @@ export function WorkspacePage() {
 
   if (!workspaceId) {
     return (
-      <div className="page">
-        <EmptyState
-          icon="⚙"
-          title="No workspace selected"
-          hint="Create or join a workspace first."
-        />
-      </div>
+      <EmptyState
+        icon={Settings2}
+        title="No workspace selected"
+        hint="Create or join a workspace first."
+      />
     );
   }
   if (detailQuery.isLoading)
@@ -99,7 +103,7 @@ export function WorkspacePage() {
   const detail: WorkspaceDetail | undefined = detailQuery.data;
   if (!detail) {
     return (
-      <div className="page">
+      <div className="mx-auto max-w-lg px-5 py-10">
         <ErrorBox
           message={
             (detailQuery.error as ApiError)?.message ??
@@ -118,20 +122,14 @@ export function WorkspacePage() {
   );
 
   return (
-    <div className="page">
-      <div className="page__header">
-        <div className="page__header-text">
-          <h1>Workspace settings</h1>
-          <p className="page__subtitle">
-            {detail.name} · {detail.plan} plan · {detail.stats.memberCount}/
-            {detail.seatLimit} seats used
-          </p>
-        </div>
-        <Badge tone="accent">{role}</Badge>
-      </div>
+    <div className="mx-auto w-full max-w-[1000px] px-5 py-6">
+      <PageHeader
+        title="Workspace settings"
+        subtitle={`${detail.name} · ${detail.plan} plan · ${detail.stats.memberCount}/${detail.seatLimit} seats used`}
+        actions={<Badge tone="brand">{role}</Badge>}
+      />
 
-      <div className="grid grid--two">
-        {}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <GeneralSettingsForm
           key={JSON.stringify([detail.name, detail.slug, detail.settings])}
           workspaceId={workspaceId}
@@ -139,9 +137,9 @@ export function WorkspacePage() {
           canEdit={isAdmin}
         />
 
-        <section className="panel">
-          <h2 style={{ marginBottom: 16 }}>Stats</h2>
-          <div className="stack" style={{ gap: 10 }}>
+        <Card>
+          <CardHeader title="Stats" />
+          <div className="space-y-2">
             <Stat
               label="Members"
               value={`${detail.stats.memberCount} of ${detail.seatLimit}`}
@@ -156,60 +154,56 @@ export function WorkspacePage() {
 
           {isOwner ? (
             <>
-              <h2 style={{ margin: "24px 0 12px" }}>Ownership</h2>
-              <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+              <h3 className="mb-1.5 mt-6 text-[13px] font-bold text-ink">
+                Ownership
+              </h3>
+              <p className="mb-3 text-[12px] leading-relaxed text-muted">
                 Transfer makes another member the owner and demotes you to
                 admin. This cannot be undone without the new owner transferring
                 it back.
               </p>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setTransferOpen(true)}
+              <Button
+                icon={ShieldAlert}
                 disabled={transferTargets.length === 0}
+                onClick={() => setTransferOpen(true)}
               >
                 Transfer ownership
-              </button>
+              </Button>
               {transferTargets.length === 0 ? (
-                <p className="field__hint" style={{ marginTop: 8 }}>
+                <p className="mt-2 text-[11.5px] text-faint">
                   Invite another member before transferring ownership.
                 </p>
               ) : null}
             </>
           ) : null}
-        </section>
+        </Card>
       </div>
 
-      <section
-        className="panel"
-        style={{ marginTop: 20, borderColor: "var(--danger)" }}
-      >
-        <h2 style={{ color: "var(--danger)", marginBottom: 8 }}>Danger zone</h2>
-        <div className="row row--wrap" style={{ gap: 12 }}>
+      <Card className="mt-5 border-danger/40">
+        <h2 className="mb-2 flex items-center gap-2 text-[13.5px] font-bold text-danger">
+          <ShieldAlert size={14} aria-hidden /> Danger zone
+        </h2>
+        <div className="flex flex-wrap items-center gap-3">
           {!isOwner ? (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setLeaveOpen(true)}
-            >
+            <Button onClick={() => setLeaveOpen(true)}>
               Leave this workspace
-            </button>
+            </Button>
           ) : (
-            <span className="faint" style={{ fontSize: 13 }}>
+            <span className="text-[12.5px] text-faint">
               Owners cannot leave — transfer ownership first.
             </span>
           )}
           {isOwner ? (
-            <button
-              type="button"
-              className="btn btn--danger"
+            <Button
+              variant="danger"
+              icon={Trash2}
               onClick={() => setDeleteOpen(true)}
             >
               Delete workspace
-            </button>
+            </Button>
           ) : null}
         </div>
-      </section>
+      </Card>
 
       {transferOpen ? (
         <TransferDialog
@@ -299,15 +293,14 @@ function GeneralSettingsForm({
   };
 
   return (
-    <section className="panel">
-      <h2 style={{ marginBottom: 16 }}>General</h2>
+    <Card>
+      <CardHeader title="General" />
       {save.isError ? (
         <ErrorBox message={(save.error as ApiError).message} />
       ) : null}
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="space-y-4">
         <Field label="Workspace name">
-          <input
-            className="input"
+          <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={120}
@@ -318,83 +311,73 @@ function GeneralSettingsForm({
           label="Slug"
           hint="Used in URLs. Changing it does not break existing data."
         >
-          <input
-            className="input mono"
+          <Input
             value={slug}
             onChange={(event) => setSlug(event.target.value)}
             pattern="[a-z0-9-]+"
             minLength={3}
             maxLength={48}
             disabled={!canEdit}
+            className="font-mono"
           />
         </Field>
         <Field label="Timezone">
-          <input
-            className="input"
+          <Input
             value={timezone}
             onChange={(event) => setTimezone(event.target.value)}
             maxLength={64}
             disabled={!canEdit}
           />
         </Field>
-        <Field label="Week starts on">
-          <select
-            className="select"
-            value={weekStart}
-            onChange={(event) =>
-              setWeekStart(Number(event.target.value) as 0 | 1)
-            }
-            disabled={!canEdit}
-          >
-            <option value={1}>Monday</option>
-            <option value={0}>Sunday</option>
-          </select>
-        </Field>
-        <Field label="Default role for new members">
-          <select
-            className="select"
-            value={defaultRole}
-            onChange={(event) =>
-              setDefaultRole(event.target.value as "member" | "viewer")
-            }
-            disabled={!canEdit}
-          >
-            <option value="member">member</option>
-            <option value="viewer">viewer</option>
-          </select>
-        </Field>
-        <button
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Week starts on">
+            <Select
+              value={weekStart}
+              onChange={(event) =>
+                setWeekStart(Number(event.target.value) as 0 | 1)
+              }
+              disabled={!canEdit}
+            >
+              <option value={1}>Monday</option>
+              <option value={0}>Sunday</option>
+            </Select>
+          </Field>
+          <Field label="Default role">
+            <Select
+              value={defaultRole}
+              onChange={(event) =>
+                setDefaultRole(event.target.value as "member" | "viewer")
+              }
+              disabled={!canEdit}
+            >
+              <option value="member">member</option>
+              <option value="viewer">viewer</option>
+            </Select>
+          </Field>
+        </div>
+        <Button
           type="submit"
-          className="btn btn--primary"
-          disabled={save.isPending || !canEdit}
+          variant="primary"
+          loading={save.isPending}
+          disabled={!canEdit}
         >
-          {save.isPending ? <Spinner /> : null}
           Save changes
-        </button>
+        </Button>
         {!canEdit ? (
-          <p className="field__hint" style={{ marginTop: 10 }}>
+          <p className="text-[11.5px] text-faint">
             Only owners and admins can edit these.
           </p>
         ) : null}
       </form>
-    </section>
+    </Card>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div
-      className="row row--between"
-      style={{
-        padding: "8px 12px",
-        background: "var(--surface)",
-        borderRadius: 8,
-      }}
-    >
-      <span className="muted" style={{ fontSize: 13 }}>
-        {label}
-      </span>
-      <strong style={{ textTransform: "capitalize" }}>{value}</strong>
+    <div className="flex items-center justify-between rounded-lg bg-sunken/70 px-3 py-2">
+      <span className="text-[12px] text-muted">{label}</span>
+      <strong className="text-[12.5px] capitalize text-ink">{value}</strong>
     </div>
   );
 }
@@ -419,50 +402,45 @@ function TransferDialog({
     <Modal
       title="Transfer ownership"
       onClose={onClose}
-      wide={false}
+      size="sm"
       footer={
         <>
-          <button
-            type="button"
-            className="btn"
-            onClick={onClose}
-            disabled={busy}
-          >
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn--danger"
+          </Button>
+          <Button
+            variant="danger"
             disabled={busy || confirm !== slug || !toUserId}
+            loading={busy}
             onClick={() => onConfirm(toUserId, confirm)}
           >
-            {busy ? <Spinner /> : null}
             Transfer
-          </button>
+          </Button>
         </>
       }
     >
-      <Field label="New owner">
-        <select
-          className="select"
-          value={toUserId}
-          onChange={(event) => setToUserId(event.target.value)}
-        >
-          {targets.map((target) => (
-            <option key={target.userId} value={target.userId}>
-              {target.name}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Type the workspace slug to confirm" hint={slug}>
-        <input
-          className="input mono"
-          value={confirm}
-          onChange={(event) => setConfirm(event.target.value)}
-          autoFocus
-        />
-      </Field>
+      <div className="space-y-4">
+        <Field label="New owner">
+          <Select
+            value={toUserId}
+            onChange={(event) => setToUserId(event.target.value)}
+          >
+            {targets.map((target) => (
+              <option key={target.userId} value={target.userId}>
+                {target.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Type the workspace slug to confirm" hint={slug}>
+          <Input
+            value={confirm}
+            onChange={(event) => setConfirm(event.target.value)}
+            autoFocus
+            className="font-mono"
+          />
+        </Field>
+      </div>
     </Modal>
   );
 }
