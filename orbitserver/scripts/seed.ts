@@ -1,14 +1,3 @@
-/**
- * Seed demo data: one workspace, five users covering every role, one board
- * with three lists and a handful of cards (labels, assignees, due dates,
- * checklists) so the UI has something to show on first run.
- *
- *   npm run seed
- *
- * Idempotent: if the demo workspace slug already exists the script exits
- * without writing anything. Password for every demo account comes from
- * SEED_DEMO_PASSWORD (default `Orbit@1234567`).
- */
 import mongoose from 'mongoose';
 import { firstKey, incrementKey, type Role } from '@orbit/shared';
 import { env } from '../src/config/env.js';
@@ -167,7 +156,13 @@ async function main(): Promise<void> {
   const listIds: string[] = [];
   for (const name of ['To do', 'In progress', 'Done']) {
     listOrder = listOrder === null ? firstKey() : incrementKey(listOrder);
-    const list = await createList({ workspaceId, boardId, name, order: listOrder, cardCount: CARDS.filter((card) => card.list === listIds.length).length });
+    const list = await createList({
+      workspaceId,
+      boardId,
+      name,
+      order: listOrder,
+      cardCount: CARDS.filter((card) => card.list === listIds.length).length,
+    });
     listIds.push(String(list._id));
   }
 
@@ -189,7 +184,17 @@ async function main(): Promise<void> {
       createdBy: String(owner._id),
       watcherIds: [String(owner._id)],
       checklists: spec.checklist
-        ? [{ id: 'cl-1', title: 'Steps', items: spec.checklist.map((item, i) => ({ id: `it-${i}`, title: item.title, done: item.done })) }]
+        ? [
+            {
+              id: 'cl-1',
+              title: 'Steps',
+              items: spec.checklist.map((item, i) => ({
+                id: `it-${i}`,
+                title: item.title,
+                done: item.done,
+              })),
+            },
+          ]
         : [],
       checklistProgress: {
         done: spec.checklist?.filter((item) => item.done).length ?? 0,
@@ -198,7 +203,6 @@ async function main(): Promise<void> {
     });
   }
 
-  // Seed default pages
   const welcomePage = await createPage({
     workspaceId,
     title: 'Welcome to Orbit',
@@ -209,11 +213,18 @@ async function main(): Promise<void> {
     order: firstKey(),
     blocks: [
       { id: 'b1', type: 'h1', content: 'Welcome to your Orbit Workspace', order: 'V' },
-      { id: 'b2', type: 'paragraph', content: 'Orbit unifies Notion-style Docs, Trello-style Kanban boards, and Slack-style Chat in one connected workspace.', order: 'W' },
+      {
+        id: 'b2',
+        type: 'paragraph',
+        content:
+          'Orbit unifies Notion-style Docs, Trello-style Kanban boards, and Slack-style Chat in one connected workspace.',
+        order: 'W',
+      },
       { id: 'b3', type: 'todo', content: 'Explore the Kanban board', checked: true, order: 'X' },
       { id: 'b4', type: 'todo', content: 'Send a message in #general', checked: false, order: 'Y' },
     ],
-    plainText: 'Welcome to your Orbit Workspace. Orbit unifies Notion-style Docs, Trello-style Kanban boards, and Slack-style Chat in one connected workspace.',
+    plainText:
+      'Welcome to your Orbit Workspace. Orbit unifies Notion-style Docs, Trello-style Kanban boards, and Slack-style Chat in one connected workspace.',
     visibility: 'workspace',
     createdBy: String(owner._id),
   });
@@ -228,14 +239,19 @@ async function main(): Promise<void> {
     order: incrementKey(firstKey()),
     blocks: [
       { id: 'pb1', type: 'h2', content: 'Core Architecture', order: 'V' },
-      { id: 'pb2', type: 'paragraph', content: 'Express 5 + Mongoose 8 + Redis dual-tier caching + React 19 / Vite.', order: 'W' },
+      {
+        id: 'pb2',
+        type: 'paragraph',
+        content: 'Express 5 + Mongoose 8 + Redis dual-tier caching + React 19 / Vite.',
+        order: 'W',
+      },
     ],
-    plainText: 'Core Architecture. Express 5 + Mongoose 8 + Redis dual-tier caching + React 19 / Vite.',
+    plainText:
+      'Core Architecture. Express 5 + Mongoose 8 + Redis dual-tier caching + React 19 / Vite.',
     visibility: 'workspace',
     createdBy: String(owner._id),
   });
 
-  // Seed default channels
   const generalChannel = await createChannel({
     workspaceId,
     name: 'general',
@@ -283,7 +299,8 @@ async function main(): Promise<void> {
     },
     'seed complete — sign in with any of the demo emails',
   );
-  for (const person of PEOPLE) logger.info({ email: person.email, role: person.role }, 'demo account');
+  for (const person of PEOPLE)
+    logger.info({ email: person.email, role: person.role }, 'demo account');
 
   await mongoose.disconnect();
   process.exit(0);

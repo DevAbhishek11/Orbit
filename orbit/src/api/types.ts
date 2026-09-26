@@ -1,16 +1,9 @@
-/**
- * Response types for the Orbit API.
- * These mirror what `orbitserver` actually returns (see the matching
- * `*.service.ts` serializers) — the API always wraps payloads in
- * `{ success, data, meta }`, which `client.ts` unwraps before we get here.
- */
-
-export type Role = 'owner' | 'admin' | 'manager' | 'member' | 'viewer';
-export type Visibility = 'workspace' | 'private';
-export type Priority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
+export type Role = "owner" | "admin" | "manager" | "member" | "viewer";
+export type Visibility = "workspace" | "private";
+export type Priority = "none" | "low" | "medium" | "high" | "urgent";
 
 export interface Preferences {
-  theme: 'light' | 'dark' | 'system';
+  theme: "light" | "dark" | "system";
   emailNotifications: boolean;
   pushNotifications: boolean;
   quietHoursStart?: string | null;
@@ -44,7 +37,12 @@ export interface Workspace {
   slug: string;
   logoUrl: string | null;
   role: Role;
-  stats: { memberCount: number; boardCount: number; pageCount: number; channelCount: number };
+  stats: {
+    memberCount: number;
+    boardCount: number;
+    pageCount: number;
+    channelCount: number;
+  };
   joinedAt: string;
 }
 
@@ -53,10 +51,14 @@ export interface WorkspaceDetail {
   name: string;
   slug: string;
   logoUrl: string | null;
-  plan: 'free' | 'pro';
+  plan: "free" | "pro";
   seatLimit: number;
-  settings: { timezone: string; weekStart: 0 | 1; defaultRole: 'member' | 'viewer' };
-  stats: Workspace['stats'];
+  settings: {
+    timezone: string;
+    weekStart: 0 | 1;
+    defaultRole: "member" | "viewer";
+  };
+  stats: Workspace["stats"];
   archivedAt: string | null;
   createdAt: string;
 }
@@ -64,7 +66,7 @@ export interface WorkspaceDetail {
 export interface Member {
   userId: string;
   role: Role;
-  status: 'active' | 'suspended';
+  status: "active" | "suspended";
   joinedAt: string;
   invitedBy: string | null;
   name: string;
@@ -76,11 +78,11 @@ export interface Member {
 export interface Invite {
   id: string;
   email: string;
-  role: Exclude<Role, 'owner'>;
+  role: Exclude<Role, "owner">;
   invitedBy: string;
   createdAt: string;
   expiresAt: string;
-  state: 'pending' | 'accepted' | 'declined' | 'expired';
+  state: "pending" | "accepted" | "declined" | "expired";
 }
 
 export interface Board {
@@ -199,22 +201,20 @@ export interface Session {
   current: boolean;
 }
 
-// ── Pages / Docs ─────────────────────────────────────────────────────────────
-
 export interface PageBlock {
   id: string;
   type:
-    | 'paragraph'
-    | 'h1'
-    | 'h2'
-    | 'h3'
-    | 'bullet'
-    | 'numbered'
-    | 'todo'
-    | 'quote'
-    | 'code'
-    | 'divider'
-    | 'callout';
+    | "paragraph"
+    | "h1"
+    | "h2"
+    | "h3"
+    | "bullet"
+    | "numbered"
+    | "todo"
+    | "quote"
+    | "code"
+    | "divider"
+    | "callout";
   content: string;
   order: string;
   checked?: boolean;
@@ -234,7 +234,7 @@ export interface Page {
   order: string;
   blocks: PageBlock[];
   plainText: string;
-  visibility: 'workspace' | 'private' | 'link';
+  visibility: "workspace" | "private" | "link";
   allowedUserIds: string[];
   favouriteOf: string[];
   version: number;
@@ -256,8 +256,6 @@ export interface PageVersion {
   createdAt: string;
 }
 
-// ── Chat ─────────────────────────────────────────────────────────────────────
-
 export interface Reaction {
   emoji: string;
   userIds: string[];
@@ -269,7 +267,7 @@ export interface Channel {
   workspaceId: string;
   name: string;
   slug: string;
-  type: 'public' | 'private' | 'dm';
+  type: "public" | "private" | "dm";
   topic?: string;
   memberIds: string[];
   lastMessage?: {
@@ -306,8 +304,6 @@ export interface Message {
   updatedAt: string;
 }
 
-// ── Notifications ────────────────────────────────────────────────────────────
-
 export interface NotificationItem {
   id: string;
   _id: string;
@@ -318,15 +314,13 @@ export interface NotificationItem {
   title: string;
   body: string;
   link?: string | null;
-  entityType?: 'card' | 'page' | 'channel' | 'workspace' | null;
+  entityType?: "card" | "page" | "channel" | "workspace" | null;
   entityId?: string | null;
   groupKey?: string | null;
   groupCount: number;
   readAt?: string | null;
   createdAt: string;
 }
-
-// ── Search ───────────────────────────────────────────────────────────────────
 
 export interface SearchResults {
   cards: Card[];
@@ -340,8 +334,6 @@ export interface SearchResponse {
   totalResults: number;
   results: SearchResults;
 }
-
-// ── Analytics ────────────────────────────────────────────────────────────────
 
 export interface WorkspaceKpis {
   totalCards: number;

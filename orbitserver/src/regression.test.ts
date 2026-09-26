@@ -15,7 +15,9 @@ describe('HTTP regressions without database', () => {
     const app = createApp();
     const live = await request(app).get('/health/live');
     expect(live.status).toBe(200);
-    const login = await request(app).post('/api/v1/auth/login').send({ email: 'test@example.com', password: 'x' });
+    const login = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'test@example.com', password: 'x' });
     expect(login.status).toBe(503);
     expect((login.body as { error: { code: string } }).error.code).toBe('DEPENDENCY_UNAVAILABLE');
     expect(login.headers['x-request-id']).toBeTruthy();
@@ -35,15 +37,23 @@ describe('HTTP regressions without database', () => {
   it('validates profile patches and preserves strict writable fields', async () => {
     const { updateProfileSchema } = await import('./modules/users/users.schema.js');
     expect(updateProfileSchema.safeParse({ name: 'Alice', status: 'active' }).success).toBe(false);
-    expect(updateProfileSchema.safeParse({ preferences: { quietHoursStart: '25:00' } }).success).toBe(false);
+    expect(
+      updateProfileSchema.safeParse({ preferences: { quietHoursStart: '25:00' } }).success,
+    ).toBe(false);
     expect(updateProfileSchema.safeParse({ preferences: { theme: 'dark' } }).success).toBe(true);
   });
   it('scopes session revocation to the authenticated user', async () => {
     const { RefreshTokenModel } = await import('./modules/auth/refreshtokens.model.js');
     const { revokeFamily } = await import('./modules/auth/tokens.service.js');
-    const spy = vi.spyOn(RefreshTokenModel, 'updateMany').mockReturnValue({ exec: () => Promise.resolve({}) } as never);
+    const spy = vi
+      .spyOn(RefreshTokenModel, 'updateMany')
+      .mockReturnValue({ exec: () => Promise.resolve({}) } as never);
     await revokeFamily('family', 'revoked_by_user', 'alice');
-    expect(spy.mock.calls[0]?.[0]).toEqual({ familyId: 'family', revokedAt: null, userId: 'alice' });
+    expect(spy.mock.calls[0]?.[0]).toEqual({
+      familyId: 'family',
+      revokedAt: null,
+      userId: 'alice',
+    });
     spy.mockRestore();
   });
   it('maps mongo connectivity errors and malformed URIs to typed API errors', async () => {
@@ -79,9 +89,16 @@ describe('HTTP regressions without database', () => {
     const { errorHandler } = await import('./middleware/errorHandler.js');
 
     const app = express();
-    app.use(pagesRouter, chatRouter, notificationsRouter, searchRouter, analyticsRouter, filesRouter, errorHandler);
+    app.use(
+      pagesRouter,
+      chatRouter,
+      notificationsRouter,
+      searchRouter,
+      analyticsRouter,
+      filesRouter,
+      errorHandler,
+    );
 
-    // Unauthenticated requests are rejected with 401
     const pageRes = await request(app).get('/pages/507f1f77bcf86cd799439011');
     expect(pageRes.status).toBe(401);
 
@@ -94,7 +111,9 @@ describe('HTTP regressions without database', () => {
     const searchRes = await request(app).get('/workspaces/507f1f77bcf86cd799439011/search?q=test');
     expect(searchRes.status).toBe(401);
 
-    const analyticsRes = await request(app).get('/analytics/workspaces/507f1f77bcf86cd799439011/overview');
+    const analyticsRes = await request(app).get(
+      '/analytics/workspaces/507f1f77bcf86cd799439011/overview',
+    );
     expect(analyticsRes.status).toBe(401);
 
     const filesRes = await request(app).get('/files/507f1f77bcf86cd799439011');
@@ -108,20 +127,35 @@ describe('HTTP regressions without database', () => {
   });
   it('validates files presign input and rejects executables', async () => {
     const { presignSchema } = await import('./modules/files/files.schema.js');
-    expect(presignSchema.safeParse({ fileName: 'test.exe', mimeType: 'application/octet-stream', size: 100 }).success).toBe(
-      true,
-    ); // schema allows, service rejects
-    expect(presignSchema.safeParse({ fileName: '', mimeType: 'image/png', size: 100 }).success).toBe(false);
-    expect(presignSchema.safeParse({ fileName: 'test.png', mimeType: 'image/png', size: 0 }).success).toBe(false);
-    expect(presignSchema.safeParse({ fileName: 'test.png', mimeType: 'image/png', size: 101 * 1024 * 1024 }).success).toBe(
-      false,
-    );
+    expect(
+      presignSchema.safeParse({
+        fileName: 'test.exe',
+        mimeType: 'application/octet-stream',
+        size: 100,
+      }).success,
+    ).toBe(true);
+    expect(
+      presignSchema.safeParse({ fileName: '', mimeType: 'image/png', size: 100 }).success,
+    ).toBe(false);
+    expect(
+      presignSchema.safeParse({ fileName: 'test.png', mimeType: 'image/png', size: 0 }).success,
+    ).toBe(false);
+    expect(
+      presignSchema.safeParse({
+        fileName: 'test.png',
+        mimeType: 'image/png',
+        size: 101 * 1024 * 1024,
+      }).success,
+    ).toBe(false);
   });
   it('validates createCardFromMessage schema', async () => {
     const { createCardFromMessageSchema } = await import('./modules/boards/boards.schema.js');
-    expect(createCardFromMessageSchema.safeParse({ messageId: 'invalid', boardId: '507f1f77bcf86cd799439011' }).success).toBe(
-      false,
-    );
+    expect(
+      createCardFromMessageSchema.safeParse({
+        messageId: 'invalid',
+        boardId: '507f1f77bcf86cd799439011',
+      }).success,
+    ).toBe(false);
     expect(
       createCardFromMessageSchema.safeParse({
         messageId: '507f1f77bcf86cd799439011',

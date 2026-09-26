@@ -1,18 +1,5 @@
-/**
- * HTTP client for the Orbit API.
- *
- * - Base URL is RELATIVE (`/api/v1`), so the browser only ever talks to its own
- *   origin. `vite.config.ts` proxies that to the API in dev, and any reverse
- *   proxy can do the same in prod. This avoids CORS entirely and lets the
- *   httpOnly refresh cookie ride along.
- * - Every response uses the shared envelope `{ success, data, meta }` (see
- *   `shared/src/envelope.ts`); we unwrap `data` and surface `meta.nextCursor`.
- * - A 401 triggers exactly ONE refresh attempt (single-flighted so a burst of
- *   parallel queries can't stampede the refresh endpoint), then a retry.
- */
-
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api/v1';
-
+const API_BASE =
+  (import.meta.env.VITE_API_URL as string | undefined) ?? "/api/v1";
 
 export class ApiError extends Error {
   readonly code: string;
@@ -28,16 +15,13 @@ export class ApiError extends Error {
     requestId?: string,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
     this.code = code;
     this.status = status;
     this.details = details;
     this.requestId = requestId;
   }
 }
-
-// ── Access token ─────────────────────────────────────────────────────────────
-// Memory only. The long-lived credential is the httpOnly refresh cookie.
 
 let accessToken: string | null = null;
 
@@ -47,10 +31,7 @@ export function getAccessToken(): string | null {
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
-
 }
-
-// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface ApiMeta {
   requestId: string;
@@ -64,25 +45,27 @@ export interface ApiResult<T> {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
-  /** Idempotency-Key for safe retries on writes. */
+
   idempotencyKey?: string;
   signal?: AbortSignal;
-  /** Skip the automatic refresh-and-retry on 401 (used by the refresh call). */
+
   noRetry?: boolean;
 }
 
-// ── Refresh (single-flight) ──────────────────────────────────────────────────
-
-type AuthShape = { accessToken: string; user: unknown; workspaceId: string | null; role: string | null };
+type AuthShape = {
+  accessToken: string;
+  user: unknown;
+  workspaceId: string | null;
+  role: string | null;
+};
 
 let refreshInFlight: Promise<AuthShape | null> | null = null;
 let onSessionRefreshed: ((auth: AuthShape) => void) | null = null;
 let onSessionLost: (() => void) | null = null;
 
-/** The auth store registers these so a background refresh updates global state. */
 export function setSessionHooks(hooks: {
   onRefreshed: (auth: AuthShape) => void;
   onLost: () => void;
@@ -93,10 +76,12 @@ export function setSessionHooks(hooks: {
 
 export function refreshSession(): Promise<AuthShape | null> {
   if (!refreshInFlight) {
-    refreshInFlight = request<AuthShape>('/auth/refresh', {
-      method: 'POST',
+    refreshInFlight = request<AuthShape>("/auth/refresh", {
+      method: "POST",
       noRetry: true,
-      body: { workspaceId: localStorage.getItem('orbit.workspaceId') || undefined },
+      body: {
+        workspaceId: localStorage.getItem("orbit.workspaceId") || undefined,
+      },
     })
       .then((auth) => {
         setAccessToken(auth.accessToken);
@@ -109,8 +94,6 @@ export function refreshSession(): Promise<AuthShape | null> {
         return null;
       })
       .finally(() => {
-        // Release the lock on the next tick so callers awaiting this promise
-        // resolve before a new refresh can start.
         queueMicrotask(() => {
           refreshInFlight = null;
         });
@@ -119,21 +102,22 @@ export function refreshSession(): Promise<AuthShape | null> {
   return refreshInFlight;
 }
 
-// ── Core request ─────────────────────────────────────────────────────────────
-
-function buildUrl(path: string, query?: RequestOptions['query']): string {
+function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const url = `${API_BASE}${path}`;
   if (!query) return url;
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null || value === '') continue;
+    if (value === undefined || value === null || value === "") continue;
     params.set(key, String(value));
   }
   const qs = params.toString();
   return qs ? `${url}?${qs}` : url;
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const { data } = await requestWithMeta<T>(path, options);
   return data;
 }
@@ -143,51 +127,55 @@ export async function requestWithMeta<T>(
   options: RequestOptions = {},
 ): Promise<ApiResult<T>> {
   const attempt = async (): Promise<ApiResult<T>> => {
-    const headers: Record<string, string> = { accept: 'application/json' };
-    if (options.body !== undefined) headers['content-type'] = 'application/json';
+    const headers: Record<string, string> = { accept: "application/json" };
+    if (options.body !== undefined)
+      headers["content-type"] = "application/json";
     if (accessToken) headers.authorization = `Bearer ${accessToken}`;
-    if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
+    if (options.idempotencyKey)
+      headers["idempotency-key"] = options.idempotencyKey;
 
     let response: Response;
     try {
       response = await fetch(buildUrl(path, options.query), {
-        method: options.method ?? 'GET',
+        method: options.method ?? "GET",
         headers,
-        // Same-origin by construction, but be explicit: the refresh cookie is
-        // path-scoped to /api/v1/auth and must be sent on that call.
-        credentials: 'include',
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+
+        credentials: "include",
+        body:
+          options.body === undefined ? undefined : JSON.stringify(options.body),
         signal: options.signal,
       });
     } catch (networkErr: unknown) {
       if (options.signal?.aborted) {
         throw networkErr;
       }
-      const isMutation = options.method && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(options.method);
-      if (isMutation && typeof navigator !== 'undefined' && !navigator.onLine) {
-        // Lazy import to avoid circular deps — queue to Dexie outbox
+      const isMutation =
+        options.method &&
+        ["POST", "PATCH", "PUT", "DELETE"].includes(options.method);
+      if (isMutation && typeof navigator !== "undefined" && !navigator.onLine) {
         try {
-          const { enqueueOutbox } = await import('../lib/offline-db');
+          const { enqueueOutbox } = await import("../lib/offline-db");
           await enqueueOutbox({
             url: buildUrl(path, options.query),
-            method: options.method ?? 'GET',
-            body: options.body === undefined ? '' : JSON.stringify(options.body),
+            method: options.method ?? "GET",
+            body:
+              options.body === undefined ? "" : JSON.stringify(options.body),
             headers: headers as Record<string, string>,
           });
           throw new ApiError(
-            'OFFLINE_QUEUED',
-            'You are offline — this change has been queued and will sync when back online.',
+            "OFFLINE_QUEUED",
+            "You are offline — this change has been queued and will sync when back online.",
             0,
             { queued: true },
           );
         } catch (e) {
-          if (e instanceof ApiError && e.code === 'OFFLINE_QUEUED') throw e;
-          // fallback to normal network error if Dexie fails
+          if (e instanceof ApiError && e.code === "OFFLINE_QUEUED") throw e;
         }
       }
-      const msg = networkErr instanceof Error ? networkErr.message : 'Network error';
+      const msg =
+        networkErr instanceof Error ? networkErr.message : "Network error";
       throw new ApiError(
-        'NETWORK_ERROR',
+        "NETWORK_ERROR",
         `Unable to reach server (${msg}). Check your connection or verify backend at /status.`,
         0,
         { originalError: msg },
@@ -195,20 +183,34 @@ export async function requestWithMeta<T>(
     }
 
     if (response.status === 204) {
-      return { data: undefined as T, meta: { requestId: response.headers.get('x-request-id') ?? '-' } };
+      return {
+        data: undefined as T,
+        meta: { requestId: response.headers.get("x-request-id") ?? "-" },
+      };
     }
 
-    const payload = (await response.json().catch(() => null)) as
-      | { success: boolean; data?: T; meta?: ApiMeta; error?: { code: string; message: string; details?: unknown; requestId?: string } }
-      | null;
+    const payload = (await response.json().catch(() => null)) as {
+      success: boolean;
+      data?: T;
+      meta?: ApiMeta;
+      error?: {
+        code: string;
+        message: string;
+        details?: unknown;
+        requestId?: string;
+      };
+    } | null;
 
     if (response.ok && payload?.success) {
-      return { data: payload.data as T, meta: payload.meta ?? { requestId: '-' } };
+      return {
+        data: payload.data as T,
+        meta: payload.meta ?? { requestId: "-" },
+      };
     }
 
     const error = payload?.error;
     throw new ApiError(
-      error?.code ?? 'INTERNAL_ERROR',
+      error?.code ?? "INTERNAL_ERROR",
       error?.message ?? `Request failed with status ${response.status}`,
       response.status,
       error?.details,
@@ -223,8 +225,8 @@ export async function requestWithMeta<T>(
       err instanceof ApiError &&
       err.status === 401 &&
       !options.noRetry &&
-      !path.startsWith('/auth/login') &&
-      !path.startsWith('/auth/refresh');
+      !path.startsWith("/auth/login") &&
+      !path.startsWith("/auth/refresh");
     if (!isAuthFailure) throw err;
 
     const auth = await refreshSession();
@@ -233,9 +235,10 @@ export async function requestWithMeta<T>(
   }
 }
 
-/** Stable key for idempotent writes, so a double-click can't double-create. */
 export function idempotencyKey(prefix: string): string {
   const random = crypto.getRandomValues(new Uint8Array(8));
-  const hex = Array.from(random, (b) => b.toString(16).padStart(2, '0')).join('');
+  const hex = Array.from(random, (b) => b.toString(16).padStart(2, "0")).join(
+    "",
+  );
   return `${prefix}_${Date.now().toString(36)}${hex}`;
 }

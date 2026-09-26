@@ -1,8 +1,3 @@
-/**
- * Auth controller — HTTP plumbing only (no business logic, no Mongoose).
- * Refresh tokens live in an httpOnly cookie scoped to /api/v1/auth; the
- * access token is returned in the body for SPA memory storage.
- */
 import type { Request, Response } from 'express';
 import { COOKIES } from '@orbit/shared';
 import { env } from '../../config/env.js';
@@ -102,7 +97,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
 
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
   await authService.forgotPassword(typedBody<ForgotPasswordInput>(req), { ip: req.ip });
-  // Always the same answer — never reveal whether the account exists.
+
   ok(res, { sent: true });
 }
 
@@ -113,7 +108,7 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
 }
 
 export async function verifyEmail(req: Request, res: Response): Promise<void> {
-  const result = await authService.verifyEmail((typedBody<VerifyEmailInput>(req)).token);
+  const result = await authService.verifyEmail(typedBody<VerifyEmailInput>(req).token);
   ok(res, result);
 }
 

@@ -1,9 +1,3 @@
-/**
- * Health service (BUILD_PROMPT Phase 2): three probes with distinct purposes.
- *  - live:    process is up (no dependency checks — orchestrator kill switch)
- *  - ready:   can serve traffic (Mongo ping + Redis pings; degraded ≠ down)
- *  - startup: boot-time facts (topology, transaction support, versions)
- */
 import mongoose from 'mongoose';
 import { getDbRuntimeInfo } from '../../infrastructure/db/mongoose.js';
 import { pingCache } from '../../infrastructure/redis/cacheClient.js';
@@ -58,7 +52,6 @@ export async function buildReadyReport(): Promise<{ status: number; report: Heal
     redisQueue: redisStatus(Boolean(env.REDIS_QUEUE_URL), queueUp),
   };
 
-  // Mongo down → unavailable (503). Redis down → degraded (still serves, slower).
   const status: HealthReport['status'] = !mongoUp
     ? 'unavailable'
     : dependencies.redisCache === 'down' || dependencies.redisQueue === 'down'
@@ -86,6 +79,9 @@ export async function buildReadyReport(): Promise<{ status: number; report: Heal
   return { status: status === 'unavailable' ? 503 : 200, report };
 }
 
-export function buildLiveReport(): { status: number; report: { status: 'ok'; uptimeSeconds: number } } {
+export function buildLiveReport(): {
+  status: number;
+  report: { status: 'ok'; uptimeSeconds: number };
+} {
   return { status: 200, report: { status: 'ok', uptimeSeconds: uptimeSeconds() } };
 }

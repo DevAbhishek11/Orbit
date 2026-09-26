@@ -1,8 +1,3 @@
-/**
- * Board model (BUILD_PROMPT Phase 6).
- * visibility: workspace (every member) | private (explicit memberIds).
- * Private boards the caller can't see answer 404 — never 403 (rule 6).
- */
 import { Schema, model, type Model } from 'mongoose';
 import {
   softDeletePlugin,
@@ -19,7 +14,7 @@ export interface IBoard extends SoftDeleteFields {
   description?: string;
   visibility: BoardVisibility;
   memberIds: string[];
-  background: string; // token key: 'gradient-1' | 'solid-blue' | ...
+  background: string;
   createdBy: string;
   stats: {
     listCount: number;
@@ -48,19 +43,15 @@ const boardSchema = new Schema<IBoard>(
   { collection: 'boards', timestamps: true },
 );
 
-// Board index page: my workspace's boards, active first, recently updated first.
 boardSchema.index({ workspaceId: 1, archivedAt: 1, updatedAt: -1 });
-// Private-board access guard lookups.
+
 boardSchema.index({ workspaceId: 1, visibility: 1, memberIds: 1 });
 boardSchema.index({ createdBy: 1 });
 boardSchema.index({ name: 'text', description: 'text' });
 
 softDeletePlugin(boardSchema);
 
-export const BoardModel = model<
-  IBoard,
-  Model<IBoard, SoftDeleteQueryHelpers> & SoftDeleteStatics
->(
+export const BoardModel = model<IBoard, Model<IBoard, SoftDeleteQueryHelpers> & SoftDeleteStatics>(
   'Board',
   boardSchema,
 );

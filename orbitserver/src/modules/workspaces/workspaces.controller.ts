@@ -1,6 +1,3 @@
-/**
- * Workspaces controller — HTTP plumbing only (layering rule 1).
- */
 import type { Request, Response } from 'express';
 import { created, noContent, ok } from '../../infrastructure/http/response.js';
 import { requireAuth } from '../../middleware/authenticate.js';
@@ -34,10 +31,14 @@ export async function getWorkspace(req: Request, res: Response): Promise<void> {
 
 export async function updateWorkspace(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const result = await service.updateWorkspaceSettings(String(req.params.wid), req.body as UpdateWorkspaceInput, {
-    userId: auth.userId,
-    role: auth.role as never,
-  });
+  const result = await service.updateWorkspaceSettings(
+    String(req.params.wid),
+    req.body as UpdateWorkspaceInput,
+    {
+      userId: auth.userId,
+      role: auth.role as never,
+    },
+  );
   ok(res, result);
 }
 
@@ -59,10 +60,15 @@ export async function listMembers(req: Request, res: Response): Promise<void> {
 
 export async function updateMember(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const result = await service.updateMember(String(req.params.wid), String(req.params.userId), req.body as UpdateMemberInput, {
-    userId: auth.userId,
-    role: auth.role as never,
-  });
+  const result = await service.updateMember(
+    String(req.params.wid),
+    String(req.params.userId),
+    req.body as UpdateMemberInput,
+    {
+      userId: auth.userId,
+      role: auth.role as never,
+    },
+  );
   ok(res, result);
 }
 

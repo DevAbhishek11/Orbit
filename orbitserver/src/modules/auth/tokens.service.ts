@@ -1,10 +1,3 @@
-/**
- * Token service (BUILD_PROMPT Phase 3):
- *  - access: JWT HS256 {sub, wid, role, ver, jti, typ} with a 15-min TTL
- *  - refresh: opaque 64-byte random, stored SHA-256-hashed, rotated on use
- *  - reuse detection: presenting a rotated token revokes the WHOLE family
- *  - logout denylist: jti stored in Redis for the token's remaining life
- */
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { AUTH, CACHE } from '@orbit/shared';
@@ -59,13 +52,17 @@ export type VerifyResult =
 export function verifyAccessToken(token: string): VerifyResult {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET, {
-      algorithms: [env.JWT_ALGORITHM], // pins the algorithm — 'none' & RS/HS confusion rejected
+      algorithms: [env.JWT_ALGORITHM],
       issuer: env.JWT_ISSUER,
       audience: env.JWT_AUDIENCE,
     });
     if (typeof decoded === 'string') return { ok: false, reason: 'invalid' };
     const claims = decoded as unknown as AccessTokenClaims & { iat: number; exp: number };
-    if (claims.typ !== 'access' || typeof claims.sub !== 'string' || typeof claims.ver !== 'number') {
+    if (
+      claims.typ !== 'access' ||
+      typeof claims.sub !== 'string' ||
+      typeof claims.ver !== 'number'
+    ) {
       return { ok: false, reason: 'invalid' };
     }
     return { ok: true, claims };
@@ -75,12 +72,9 @@ export function verifyAccessToken(token: string): VerifyResult {
   }
 }
 
-// ── jti denylist (logout) ─────────────────────────────────────────────
-
 export async function denylistJti(jti: string, remainingSeconds: number): Promise<void> {
   const client = getCacheClient();
   if (!client) {
-    // Fail-closed alternative: bump tokenVersion so ALL access tokens die.
     log.warn('redis-cache down during logout — denylist skipped (token remains valid ≤15 min)');
     return;
   }
@@ -91,12 +85,10 @@ export async function denylistJti(jti: string, remainingSeconds: number): Promis
 
 export async function isJtiDenylisted(jti: string): Promise<boolean> {
   const client = getCacheClient();
-  if (!client) return false; // reads fail open here; authenticate still checks tokenVersion
+  if (!client) return false;
   const value = await client.get(`${CACHE.DENYLIST_PREFIX}${jti}`).catch(() => null);
   return value !== null;
 }
-
-// ── Refresh tokens ────────────────────────────────────────────────────
 
 export function generateRefreshTokenRaw(): string {
   return randomBytes(AUTH.REFRESH_TOKEN_BYTES).toString('base64url');
@@ -141,11 +133,6 @@ export type RotateResult =
   | { ok: true; rawToken: string; record: IRefreshToken; familyId: string }
   | { ok: false; reason: 'not_found' | 'expired' | 'revoked' | 'reused' };
 
-/**
- * Rotate a presented refresh token.
- * Reuse of an already-rotated token ⇒ REVOKE THE ENTIRE FAMILY (rule: token
- * theft is the only realistic way to replay a rotated token).
- */
 export async function rotateRefreshToken(rawToken: string): Promise<RotateResult> {
   const tokenHash = hashRefreshToken(rawToken);
   const record = await RefreshTokenModel.findOne({ tokenHash }).exec();
@@ -155,13 +142,12 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
     return { ok: false, reason: 'revoked' };
   }
   if (record.rotatedAt) {
-    // REUSE DETECTED — kill the family, force re-login everywhere in it.
     log.error(
       { userId: record.userId, familyId: record.familyId },
       'refresh token REUSE detected — revoking token family',
     );
     await revokeFamily(record.familyId, 'reuse_detected');
-    await bumpTokenVersion(record.userId); // access tokens die too
+    await bumpTokenVersion(record.userId);
     return { ok: false, reason: 'reused' };
   }
   if (record.expiresAt.getTime() <= Date.now()) {
@@ -169,8 +155,7 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
   }
 
   const remember =
-    record.expiresAt.getTime() - record.createdAt.getTime() >
-    env.REFRESH_TOKEN_TTL * 1000 + 60_000;
+    record.expiresAt.getTime() - record.createdAt.getTime() > env.REFRESH_TOKEN_TTL * 1000 + 60_000;
   const issued = await issueRefreshToken({
     userId: record.userId,
     familyId: record.familyId,
@@ -180,8 +165,6 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
     ip: record.ip,
   });
 
-  // Mark rotation atomically — a concurrent double-refresh lets exactly one
-  // caller win the findOneAndUpdate; the loser re-reads and sees rotatedAt set.
   const rotated = await RefreshTokenModel.findOneAndUpdate(
     { _id: record._id, rotatedAt: null, revokedAt: null },
     {
@@ -195,17 +178,25 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
   ).exec();
 
   if (!rotated) {
-    // Lost the race — the winner already rotated; the issued token is orphaned.
     await RefreshTokenModel.deleteOne({ tokenHash: hashRefreshToken(issued.rawToken) }).exec();
     const current = await RefreshTokenModel.findOne({ tokenHash }).exec();
     if (current?.rotatedAt) return { ok: false, reason: 'reused' };
     return { ok: false, reason: 'revoked' };
   }
 
-  return { ok: true, rawToken: issued.rawToken, record: rotated.toObject(), familyId: record.familyId };
+  return {
+    ok: true,
+    rawToken: issued.rawToken,
+    record: rotated.toObject(),
+    familyId: record.familyId,
+  };
 }
 
-export async function revokeFamily(familyId: string, reason: string, userId?: string): Promise<void> {
+export async function revokeFamily(
+  familyId: string,
+  reason: string,
+  userId?: string,
+): Promise<void> {
   await RefreshTokenModel.updateMany(
     { familyId, revokedAt: null, ...(userId ? { userId } : {}) },
     { $set: { revokedAt: new Date(), revokedReason: reason } },
@@ -231,7 +222,7 @@ export async function listActiveSessions(userId: string): Promise<IRefreshToken[
   return RefreshTokenModel.find({
     userId,
     revokedAt: null,
-    rotatedAt: null, // only the CURRENT token of each family is an active session
+    rotatedAt: null,
     expiresAt: { $gt: new Date() },
   })
     .sort({ createdAt: -1 })
@@ -239,7 +230,6 @@ export async function listActiveSessions(userId: string): Promise<IRefreshToken[
     .exec();
 }
 
-/** Constant-time compare helper for CSRF double-submit tokens. */
 export function safeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);

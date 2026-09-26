@@ -1,14 +1,3 @@
-/**
- * Auth service (BUILD_PROMPT Phase 3) — business logic only, no req/res.
- *
- * Security properties implemented here:
- *  - timing-safe login (dummy hash comparison for unknown emails)
- *  - account lockout after N failures for M minutes
- *  - generic error for wrong-email AND wrong-password (no enumeration)
- *  - rotating refresh tokens with family reuse detection (tokens.service)
- *  - logout denylist for immediate access-token death
- *  - single-use hashed tokens for email verification + password reset
- */
 import { createHash, randomBytes } from 'node:crypto';
 import { env } from '../../config/env.js';
 import { ApiError, unauthenticated } from '../../infrastructure/errors/ApiError.js';
@@ -125,8 +114,6 @@ async function buildTokenBundle(
   };
 }
 
-// ── register ──────────────────────────────────────────────────────────
-
 export async function register(input: RegisterInput, context: RequestContext): Promise<AuthResult> {
   const policy = checkPasswordPolicy(input.password, { email: input.email, name: input.name });
   if (!policy.ok) {
@@ -178,7 +165,11 @@ function deriveHandle(email: string): string {
 }
 
 async function uniqueHandle(candidate: string): Promise<string> {
-  const normalized = candidate.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) || 'user';
+  const normalized =
+    candidate
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 24) || 'user';
   let handle = normalized.length >= 3 ? normalized : `${normalized}_u`;
   for (let attempt = 0; attempt < 5; attempt++) {
     if (!(await findUserByHandle(handle))) return handle;
@@ -199,13 +190,10 @@ async function issueVerificationToken(user: UserDoc): Promise<void> {
   });
 }
 
-// ── login (timing-safe + lockout) ─────────────────────────────────────
-
 export async function login(input: LoginInput, context: RequestContext): Promise<AuthResult> {
   const user = await findUserByEmail(input.email, { withPassword: true });
 
   if (!user) {
-    // Equalize timing: burn a real hash comparison even for unknown emails.
     await verifyPassword(await getDummyHash(), input.password);
     authEventsTotal.inc({ event: 'login_fail' });
     throw unauthenticated('Invalid email or password');
@@ -214,10 +202,14 @@ export async function login(input: LoginInput, context: RequestContext): Promise
   if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
     const retryAfterSeconds = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000);
     authEventsTotal.inc({ event: 'lockout' });
-    throw new ApiError('ACCOUNT_LOCKED', 'Account temporarily locked due to repeated failed logins', {
-      headers: { 'Retry-After': String(retryAfterSeconds) },
-      details: { lockedUntil: user.lockedUntil.toISOString() },
-    });
+    throw new ApiError(
+      'ACCOUNT_LOCKED',
+      'Account temporarily locked due to repeated failed logins',
+      {
+        headers: { 'Retry-After': String(retryAfterSeconds) },
+        details: { lockedUntil: user.lockedUntil.toISOString() },
+      },
+    );
   }
 
   if (user.status === 'suspended' || user.status === 'deleted') {
@@ -227,9 +219,13 @@ export async function login(input: LoginInput, context: RequestContext): Promise
 
   const passwordOk = await verifyPassword(user.passwordHash, input.password);
   if (!passwordOk) {
-    await recordFailedLogin(String(user._id), env.LOGIN_MAX_ATTEMPTS, env.LOGIN_LOCKOUT_MINUTES * 60_000);
+    await recordFailedLogin(
+      String(user._id),
+      env.LOGIN_MAX_ATTEMPTS,
+      env.LOGIN_LOCKOUT_MINUTES * 60_000,
+    );
     authEventsTotal.inc({ event: 'login_fail' });
-    // Same message for wrong email and wrong password — no enumeration.
+
     throw unauthenticated('Invalid email or password');
   }
 
@@ -252,8 +248,6 @@ export async function login(input: LoginInput, context: RequestContext): Promise
   authEventsTotal.inc({ event: 'login_ok' });
   return { user: toPublicUser(fresh), ...bundle };
 }
-
-// ── refresh (rotation + reuse detection) ──────────────────────────────
 
 export async function refresh(
   rawToken: string | undefined,
@@ -303,15 +297,12 @@ export async function refresh(
   };
 }
 
-// ── logout ────────────────────────────────────────────────────────────
-
 export async function logout(
   accessToken: string | undefined,
   refreshTokenRaw: string | undefined,
   allDevices: boolean,
   context: { userId?: string; ip?: string },
 ): Promise<void> {
-  // Denylist the presented access token for its remaining lifetime.
   if (accessToken) {
     const verified = verifyAccessToken(accessToken);
     if (verified.ok) {
@@ -340,9 +331,10 @@ export async function logout(
   }
 }
 
-// ── forgot / reset password ───────────────────────────────────────────
-
-export async function forgotPassword(input: ForgotPasswordInput, context: { ip?: string }): Promise<void> {
+export async function forgotPassword(
+  input: ForgotPasswordInput,
+  context: { ip?: string },
+): Promise<void> {
   const user = await findUserByEmail(input.email);
   if (user) {
     const raw = randomBytes(32).toString('base64url');
@@ -362,14 +354,20 @@ export async function forgotPassword(input: ForgotPasswordInput, context: { ip?:
       ip: context.ip,
     });
   } else {
-    // Equalize timing with the user-found path (rough mail-cost parity).
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   log.debug('password reset requested');
 }
 
-export async function resetPassword(input: ResetPasswordInput, context: { ip?: string }): Promise<void> {
-  const user = await findUserByTokenHash('resetTokenHash', 'resetTokenExpiresAt', hashToken(input.token));
+export async function resetPassword(
+  input: ResetPasswordInput,
+  context: { ip?: string },
+): Promise<void> {
+  const user = await findUserByTokenHash(
+    'resetTokenHash',
+    'resetTokenExpiresAt',
+    hashToken(input.token),
+  );
   if (!user) {
     throw new ApiError('TOKEN_EXPIRED', 'Reset token is invalid or has expired', { status: 401 });
   }
@@ -383,7 +381,7 @@ export async function resetPassword(input: ResetPasswordInput, context: { ip?: s
   }
 
   const passwordHash = await hashPassword(input.password);
-  await updatePasswordHash(String(user._id), passwordHash); // also bumps tokenVersion
+  await updatePasswordHash(String(user._id), passwordHash);
   await revokeAllUserTokens(String(user._id), 'password_reset');
   await setResetToken(String(user._id), null, null);
 
@@ -397,8 +395,6 @@ export async function resetPassword(input: ResetPasswordInput, context: { ip?: s
   authEventsTotal.inc({ event: 'password_reset' });
 }
 
-// ── verify email ──────────────────────────────────────────────────────
-
 export async function verifyEmail(token: string): Promise<{ email: string }> {
   const user = await findUserByTokenHash(
     'verificationTokenHash',
@@ -406,7 +402,9 @@ export async function verifyEmail(token: string): Promise<{ email: string }> {
     hashToken(token),
   );
   if (!user) {
-    throw new ApiError('TOKEN_EXPIRED', 'Verification token is invalid or has expired', { status: 401 });
+    throw new ApiError('TOKEN_EXPIRED', 'Verification token is invalid or has expired', {
+      status: 401,
+    });
   }
   await markEmailVerified(String(user._id));
   await recordAudit({
@@ -417,8 +415,6 @@ export async function verifyEmail(token: string): Promise<{ email: string }> {
   });
   return { email: user.email };
 }
-
-// ── sessions ──────────────────────────────────────────────────────────
 
 export async function getSessions(userId: string, currentRefreshRaw?: string): Promise<unknown[]> {
   const sessions = await listActiveSessions(userId);
@@ -445,8 +441,6 @@ export async function revokeSession(userId: string, familyId: string): Promise<v
     after: { familyId },
   });
 }
-
-// ── switch workspace (multi-tenant token scoping) ─────────────────────
 
 export async function switchWorkspace(
   userId: string,

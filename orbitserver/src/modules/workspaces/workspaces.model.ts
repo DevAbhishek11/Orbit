@@ -1,8 +1,3 @@
-/**
- * Workspace model (BUILD_PROMPT Phase 5) — the tenant boundary.
- * Every tenant document carries workspaceId; every query filters by it.
- * `stats` are denormalized counters kept correct inside transactions.
- */
 import { Schema, model, type Model } from 'mongoose';
 import { WORKSPACE } from '@orbit/shared';
 import {
@@ -23,7 +18,7 @@ export interface IWorkspace extends SoftDeleteFields {
   storageQuotaBytes: number;
   settings: {
     timezone: string;
-    weekStart: 0 | 1; // 0 = Sunday, 1 = Monday
+    weekStart: 0 | 1;
     defaultRole: 'member' | 'viewer';
   };
   stats: {
@@ -80,7 +75,4 @@ softDeletePlugin(workspaceSchema);
 export const WorkspaceModel = model<
   IWorkspace,
   Model<IWorkspace, SoftDeleteQueryHelpers> & SoftDeleteStatics
->(
-  'Workspace',
-  workspaceSchema,
-);
+>('Workspace', workspaceSchema);

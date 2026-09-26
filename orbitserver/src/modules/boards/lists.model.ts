@@ -1,7 +1,3 @@
-/**
- * List (Kanban column) model — ordering via fractional string keys (rule 9).
- * `cardCount` is denormalized and kept correct inside the move transaction.
- */
 import { Schema, model, type Model } from 'mongoose';
 import {
   softDeletePlugin,
@@ -14,7 +10,7 @@ export interface IList extends SoftDeleteFields {
   workspaceId: string;
   boardId: string;
   name: string;
-  order: string; // fractional key — base62, sorts lexicographically
+  order: string;
   color?: string;
   wipLimit?: number | null;
   cardCount: number;
@@ -37,16 +33,12 @@ const listSchema = new Schema<IList>(
   { collection: 'lists', timestamps: true },
 );
 
-// THE hot index: board render sorts lists by fractional order.
 listSchema.index({ boardId: 1, order: 1 });
 listSchema.index({ workspaceId: 1, archivedAt: 1 });
 
 softDeletePlugin(listSchema);
 
-export const ListModel = model<
-  IList,
-  Model<IList, SoftDeleteQueryHelpers> & SoftDeleteStatics
->(
+export const ListModel = model<IList, Model<IList, SoftDeleteQueryHelpers> & SoftDeleteStatics>(
   'List',
   listSchema,
 );

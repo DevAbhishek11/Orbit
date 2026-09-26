@@ -1,6 +1,3 @@
-/**
- * Chat routes (BUILD_PROMPT Phase 8 — Slack pillar).
- */
 import { Router, type Request } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import { authorize, type ScopeDescriptor } from '../../middleware/authorize.js';
@@ -38,7 +35,6 @@ async function loadChannel(req: Request): Promise<ScopeDescriptor | null> {
   };
 }
 
-// Workspace channels collection
 chatRouter.post(
   '/workspaces/:wid/channels',
   authenticate(),
@@ -57,7 +53,6 @@ chatRouter.get(
   controller.listChannels,
 );
 
-// Channel item & messages
 chatRouter.get(
   '/channels/:id',
   authenticate(),
@@ -110,7 +105,6 @@ chatRouter.post(
   controller.markRead,
 );
 
-// Message item operations (reactions, edit, delete, thread)
 chatRouter.patch(
   '/messages/:id',
   authenticate(),

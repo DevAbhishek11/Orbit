@@ -1,8 +1,3 @@
-/**
- * Users service — self-service profile. Business logic only (no req/res).
- * Every mutation is audited, and preference patches merge field-by-field so a
- * partial update can never wipe the rest of the sub-document.
- */
 import { notFound } from '../../infrastructure/errors/ApiError.js';
 import { recordAudit } from '../audit/audit.service.js';
 import { toPublicUser, type UserDoc } from './users.model.js';
@@ -15,7 +10,6 @@ export async function getProfile(userId: string): Promise<Record<string, unknown
   return toPublicUser(user);
 }
 
-/** Flatten a preferences patch into `preferences.<key>` dotted paths. */
 function buildProfileUpdate(input: UpdateProfileInput): Record<string, unknown> {
   const update: Record<string, unknown> = {};
   if (input.name !== undefined) update.name = input.name;

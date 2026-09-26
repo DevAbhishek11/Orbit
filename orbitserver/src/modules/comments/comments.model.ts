@@ -1,7 +1,3 @@
-/**
- * Unified comments collection (BUILD_PROMPT Phase 6 item 8):
- * one collection for card/page/message comments, with mention extraction.
- */
 import { Schema, model, type Model } from 'mongoose';
 import { CONTENT } from '@orbit/shared';
 import {
@@ -19,7 +15,7 @@ export interface IComment extends SoftDeleteFields {
   entityId: string;
   authorId: string;
   body: string;
-  mentions: string[]; // userIds mentioned in the body
+  mentions: string[];
   editedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -48,12 +44,8 @@ softDeletePlugin(commentSchema);
 export const CommentModel = model<
   IComment,
   Model<IComment, SoftDeleteQueryHelpers> & SoftDeleteStatics
->(
-  'Comment',
-  commentSchema,
-);
+>('Comment', commentSchema);
 
-/** Extract @handle mentions into candidate handles (resolution is a service step). */
 export function extractMentionHandles(body: string): string[] {
   const matches = body.match(/@[a-z0-9_]{3,30}/gi);
   if (!matches) return [];

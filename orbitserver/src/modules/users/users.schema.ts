@@ -1,8 +1,3 @@
-/**
- * User endpoint contracts (Zod — single source of truth).
- * Only the fields a user may change about themselves are exposed here;
- * status/role/tokenVersion are admin- or system-controlled and stay out.
- */
 import { z } from 'zod';
 
 export const objectId = z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid id');

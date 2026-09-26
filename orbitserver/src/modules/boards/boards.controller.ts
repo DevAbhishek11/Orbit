@@ -1,6 +1,3 @@
-/**
- * Boards controller — HTTP plumbing only.
- */
 import type { Request, Response } from 'express';
 import { created, noContent, ok } from '../../infrastructure/http/response.js';
 import { requireAuth } from '../../middleware/authenticate.js';
@@ -15,17 +12,25 @@ import type {
 
 export async function createBoard(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const board = await service.createBoardForWorkspace(String(req.params.wid), req.body as CreateBoardInput, {
-    userId: auth.userId,
-    role: auth.role!,
-  });
+  const board = await service.createBoardForWorkspace(
+    String(req.params.wid),
+    req.body as CreateBoardInput,
+    {
+      userId: auth.userId,
+      role: auth.role!,
+    },
+  );
   created(res, board);
 }
 
 export async function listBoards(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
   const includeArchived = req.query.includeArchived === 'true';
-  const boards = await service.listBoardsForUser(String(req.params.wid), auth.userId, includeArchived);
+  const boards = await service.listBoardsForUser(
+    String(req.params.wid),
+    auth.userId,
+    includeArchived,
+  );
   ok(res, { boards });
 }
 
@@ -38,25 +43,38 @@ export async function updateBoard(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
   ok(
     res,
-    await service.updateBoardDetails(String(req.params.id), auth.workspaceId!, req.body as UpdateBoardInput, {
-      userId: auth.userId,
-      role: auth.role!,
-    }),
+    await service.updateBoardDetails(
+      String(req.params.id),
+      auth.workspaceId!,
+      req.body as UpdateBoardInput,
+      {
+        userId: auth.userId,
+        role: auth.role!,
+      },
+    ),
   );
 }
 
 export async function deleteBoard(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  await service.deleteBoardSoft(String(req.params.id), auth.workspaceId!, { userId: auth.userId, role: auth.role! });
+  await service.deleteBoardSoft(String(req.params.id), auth.workspaceId!, {
+    userId: auth.userId,
+    role: auth.role!,
+  });
   noContent(res);
 }
 
 export async function createList(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const list = await service.createListOnBoard(String(req.params.id), auth.workspaceId!, req.body as CreateListInput, {
-    userId: auth.userId,
-    role: auth.role!,
-  });
+  const list = await service.createListOnBoard(
+    String(req.params.id),
+    auth.workspaceId!,
+    req.body as CreateListInput,
+    {
+      userId: auth.userId,
+      role: auth.role!,
+    },
+  );
   created(res, list);
 }
 
@@ -64,10 +82,15 @@ export async function updateList(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
   ok(
     res,
-    await service.updateListDetails(String(req.params.id), auth.workspaceId!, req.body as UpdateListInput, {
-      userId: auth.userId,
-      role: auth.role!,
-    }),
+    await service.updateListDetails(
+      String(req.params.id),
+      auth.workspaceId!,
+      req.body as UpdateListInput,
+      {
+        userId: auth.userId,
+        role: auth.role!,
+      },
+    ),
   );
 }
 
@@ -83,8 +106,11 @@ export async function deleteList(req: Request, res: Response): Promise<void> {
 
 export async function reorderLists(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  ok(res, await service.reorderLists(auth.workspaceId!, req.body as ReorderListsInput, {
-    userId: auth.userId,
-    role: auth.role!,
-  }));
+  ok(
+    res,
+    await service.reorderLists(auth.workspaceId!, req.body as ReorderListsInput, {
+      userId: auth.userId,
+      role: auth.role!,
+    }),
+  );
 }

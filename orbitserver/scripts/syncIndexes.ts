@@ -1,13 +1,3 @@
-/**
- * Create/refresh every index declared on the Mongoose schemas.
- *
- * The API boots with `autoIndex: false` (see infrastructure/db/mongoose.ts) so
- * a cold start never races an index build. Run this once per environment:
- *
- *   npm run sync-indexes
- *
- * Exit code is non-zero when any index fails to build, so CI can gate on it.
- */
 import mongoose from 'mongoose';
 import { env } from '../src/config/env.js';
 import { logger } from '../src/infrastructure/logger/index.js';
@@ -64,10 +54,7 @@ async function main(): Promise<void> {
     try {
       await model.createIndexes();
       const indexes = await model.listIndexes();
-      logger.info(
-        { collection: model.collection.name, indexes: indexes.length },
-        'indexes synced',
-      );
+      logger.info({ collection: model.collection.name, indexes: indexes.length }, 'indexes synced');
     } catch (err) {
       failed += 1;
       logger.error({ collection: model.collection.name, err }, 'index sync FAILED');

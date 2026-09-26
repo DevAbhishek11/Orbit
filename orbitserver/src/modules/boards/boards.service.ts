@@ -1,9 +1,3 @@
-/**
- * Boards & lists service (BUILD_PROMPT Phase 6).
- *  - board render = ONE cached aggregation (A1) → lists with their cards
- *  - list ordering via fractional keys; reorder (T5) is one transaction
- *  - every mutation: activity + audit + cache invalidation + post-commit emit
- */
 import { BOARD_CACHE_TTL } from './cacheTags.js';
 import { evenKeys, firstKey, incrementKey, keyBetween } from '@orbit/shared';
 import { runInTransaction } from '../../infrastructure/db/transaction.js';
@@ -34,7 +28,13 @@ import {
   type ListDoc,
 } from './boards.repository.js';
 import { CardModel } from '../cards/cards.model.js';
-import type { CreateBoardInput, CreateListInput, ReorderListsInput, UpdateBoardInput, UpdateListInput } from './boards.schema.js';
+import type {
+  CreateBoardInput,
+  CreateListInput,
+  ReorderListsInput,
+  UpdateBoardInput,
+  UpdateListInput,
+} from './boards.schema.js';
 
 export interface Actor {
   userId: string;
@@ -47,11 +47,9 @@ function boardId(board: BoardDoc): string {
 
 async function loadBoardOr404(boardIdRaw: string, workspaceId: string): Promise<BoardDoc> {
   const board = await findBoardByIdScoped(boardIdRaw, workspaceId);
-  if (!board) throw notFound('Board'); // cross-tenant → 404 (rule 6)
+  if (!board) throw notFound('Board');
   return board;
 }
-
-// ── Boards ────────────────────────────────────────────────────────────
 
 export async function createBoardForWorkspace(
   workspaceId: string,
@@ -74,7 +72,13 @@ export async function createBoardForWorkspace(
       );
       await incWorkspaceStats(workspaceId, { boardCount: 1 }, tx.session);
       await createActivity(
-        { workspaceId, entityType: 'board', entityId: boardId(created), actorId: actor.userId, action: 'created' },
+        {
+          workspaceId,
+          entityType: 'board',
+          entityId: boardId(created),
+          actorId: actor.userId,
+          action: 'created',
+        },
         tx.session,
       );
       await recordAudit({
@@ -126,20 +130,17 @@ export async function listBoardsForUser(
   );
 }
 
-export async function getBoardDetails(boardIdRaw: string, workspaceId: string): Promise<Record<string, unknown>> {
+export async function getBoardDetails(
+  boardIdRaw: string,
+  workspaceId: string,
+): Promise<Record<string, unknown>> {
   const board = await loadBoardOr404(boardIdRaw, workspaceId);
-  return getOrSet(
-    `board:${boardIdRaw}:view`,
-    () => buildBoardView(board),
-    { ttlSeconds: BOARD_CACHE_TTL, tags: [`board:${boardIdRaw}`] },
-  );
+  return getOrSet(`board:${boardIdRaw}:view`, () => buildBoardView(board), {
+    ttlSeconds: BOARD_CACHE_TTL,
+    tags: [`board:${boardIdRaw}`],
+  });
 }
 
-/**
- * Aggregation A1 — one round trip returns the board's lists WITH their first
- * 100 cards (index-backed: {boardId, order} and {listId, order}), plus one
- * users fetch for assignee profiles. Cached under tag board:{id}.
- */
 interface BoardCardRaw extends Record<string, unknown> {
   assignees?: string[];
 }
@@ -172,7 +173,7 @@ async function buildBoardView(board: BoardDoc): Promise<Record<string, unknown>>
   const assigneeIds = new Set<string>();
   for (const list of rows) {
     for (const card of list.cards) {
-      for (const a of (card.assignees) ?? []) assigneeIds.add(a);
+      for (const a of card.assignees ?? []) assigneeIds.add(a);
     }
   }
   const users = await findUsersByIds([...assigneeIds]);
@@ -195,7 +196,9 @@ async function buildBoardView(board: BoardDoc): Promise<Record<string, unknown>>
       cards: list.cards.map((card) => ({
         ...card,
         id: String(card._id),
-        assigneeProfiles: (card.assignees ?? []).map((a) => profiles.get(a) ?? null).filter(Boolean),
+        assigneeProfiles: (card.assignees ?? [])
+          .map((a) => profiles.get(a) ?? null)
+          .filter(Boolean),
       })),
     })),
   };
@@ -261,8 +264,6 @@ export async function deleteBoardSoft(
   emitSafe(`workspace:${workspaceId}`, 'board:deleted', { boardId: boardIdRaw, workspaceId });
 }
 
-// ── Lists ─────────────────────────────────────────────────────────────
-
 export async function createListOnBoard(
   boardIdRaw: string,
   workspaceId: string,
@@ -288,7 +289,14 @@ export async function createListOnBoard(
       );
       await incBoardStats(boardIdRaw, { listCount: 1 }, tx.session);
       await createActivity(
-        { workspaceId, entityType: 'list', entityId: boardIdRaw, actorId: actor.userId, action: 'list_created', meta: { listName: input.name, listId: String(created._id) } },
+        {
+          workspaceId,
+          entityType: 'list',
+          entityId: boardIdRaw,
+          actorId: actor.userId,
+          action: 'list_created',
+          meta: { listName: input.name, listId: String(created._id) },
+        },
         tx.session,
       );
       await recordAudit({
@@ -308,7 +316,10 @@ export async function createListOnBoard(
 
   void board;
   await invalidateTag(`board:${boardIdRaw}`);
-  emitSafe(`board:${boardIdRaw}`, 'list:created', { listId: String(list._id), boardId: boardIdRaw });
+  emitSafe(`board:${boardIdRaw}`, 'list:created', {
+    listId: String(list._id),
+    boardId: boardIdRaw,
+  });
   return serializeList(list);
 }
 
@@ -367,9 +378,12 @@ export async function deleteListWithGuard(
 
   const cardCount = await CardModel.countDocuments({ listId: listIdRaw, archivedAt: null }).exec();
   if (cardCount > 0 && !force) {
-    throw badRequest(`List still holds ${cardCount} card(s) — pass force=true to archive them all`, {
-      cardCount,
-    });
+    throw badRequest(
+      `List still holds ${cardCount} card(s) — pass force=true to archive them all`,
+      {
+        cardCount,
+      },
+    );
   }
 
   await runInTransaction(
@@ -400,7 +414,6 @@ export async function deleteListWithGuard(
   emitSafe(`board:${list.boardId}`, 'list:deleted', { listId: listIdRaw, boardId: list.boardId });
 }
 
-/** T5 — bulk list reorder: full ordered set validated, one transaction. */
 export async function reorderLists(
   workspaceId: string,
   input: ReorderListsInput,
@@ -412,7 +425,7 @@ export async function reorderLists(
   const requested = new Set(input.listIds);
 
   if (currentIds.size !== requested.size || [...requested].some((id) => !currentIds.has(id))) {
-    throw badRequest('listIds must be exactly the board\'s active lists in the new order');
+    throw badRequest("listIds must be exactly the board's active lists in the new order");
   }
 
   const newOrders = evenKeys(input.listIds.length);
@@ -424,7 +437,13 @@ export async function reorderLists(
       );
       await updateBoard(boardId(board), workspaceId, { updatedAt: new Date() }, tx.session);
       await createActivity(
-        { workspaceId, entityType: 'board', entityId: boardId(board), actorId: actor.userId, action: 'lists_reordered' },
+        {
+          workspaceId,
+          entityType: 'board',
+          entityId: boardId(board),
+          actorId: actor.userId,
+          action: 'lists_reordered',
+        },
         tx.session,
       );
       await recordAudit({
@@ -449,7 +468,6 @@ export async function reorderLists(
   return { listIds: input.listIds };
 }
 
-/** Gap helper used by cards.service for target-list validation. */
 export function orderBetween(prev: string | null, next: string | null): string {
   return keyBetween(prev, next);
 }

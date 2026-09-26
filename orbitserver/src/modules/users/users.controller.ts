@@ -1,6 +1,3 @@
-/**
- * Users controller — HTTP plumbing only (layering rule 1).
- */
 import type { Request, Response } from 'express';
 import { ok } from '../../infrastructure/http/response.js';
 import { requireAuth } from '../../middleware/authenticate.js';

@@ -1,15 +1,8 @@
-/**
- * Orbit global constants — limits, tiers, TTLs (BUILD_PROMPT §4).
- * Changing a number here changes it everywhere (API + web + tests).
- */
-
-/** Pagination contract: cursor-based, `skip` is forbidden. */
 export const PAGINATION = {
   DEFAULT_LIMIT: 25,
   MAX_LIMIT: 100,
 } as const;
 
-/** Auth TTLs and limits. */
 export const AUTH = {
   ACCESS_TOKEN_TTL_SECONDS: 15 * 60,
   REFRESH_TOKEN_TTL_DAYS: 7,
@@ -24,7 +17,6 @@ export const AUTH = {
   SESSION_CACHE_TTL_SECONDS: 15 * 60,
 } as const;
 
-/** Rate-limit tiers (requests per window). Auth tier fails CLOSED, reads fail OPEN. */
 export const RATE_LIMIT_TIERS = {
   global: { limit: 300, windowMs: 60_000 },
   auth: { limit: 10, windowMs: 15 * 60_000 },
@@ -36,7 +28,6 @@ export const RATE_LIMIT_TIERS = {
 
 export type RateLimitTier = keyof typeof RATE_LIMIT_TIERS;
 
-/** Workspace / tenant limits. */
 export const WORKSPACE = {
   FREE_SEAT_LIMIT: 10,
   PRO_SEAT_LIMIT: 100,
@@ -44,7 +35,6 @@ export const WORKSPACE = {
   FREE_STORAGE_QUOTA_BYTES: 1_073_741_824,
 } as const;
 
-/** Content limits — bounded arrays protect document size (16 MB cap). */
 export const CONTENT = {
   CARD_TITLE_MAX: 200,
   CARD_DESCRIPTION_MAX: 20_000,
@@ -63,7 +53,6 @@ export const CONTENT = {
   ORDER_KEY_MAX_LENGTH: 60,
 } as const;
 
-/** Cache TTLs (seconds) and tags. */
 export const CACHE = {
   TTL_DEFAULT: 300,
   TTL_BOARD: 300,
@@ -75,19 +64,17 @@ export const CACHE = {
   TTL_SUGGESTIONS: 600,
   SWR_SECONDS: 1_800,
   IDEMPOTENCY_TTL_SECONDS: 24 * 3_600,
-  DENYLIST_PREFIX: 'denylist:jti:',
+  DENYLIST_PREFIX: "denylist:jti:",
 } as const;
 
-/** Soft delete / retention. */
 export const RETENTION = {
   TRASH_DAYS: 30,
   AUDIT_TTL_DAYS: 365,
   NOTIFICATION_TTL_DAYS: 180,
 } as const;
 
-/** Socket.io contract. */
 export const SOCKET = {
-  PATH: '/socket.io',
+  PATH: "/socket.io",
   MAX_HTTP_BUFFER: 65_536,
   PING_INTERVAL: 25_000,
   PING_TIMEOUT: 20_000,
@@ -96,9 +83,8 @@ export const SOCKET = {
   TYPING_TTL_SECONDS: 4,
 } as const;
 
-/** Cookie names (single source of truth for API + web). */
 export const COOKIES = {
-  ACCESS: 'orbit_at',
-  REFRESH: 'orbit_rt',
-  CSRF: 'orbit_csrf',
+  ACCESS: "orbit_at",
+  REFRESH: "orbit_rt",
+  CSRF: "orbit_csrf",
 } as const;

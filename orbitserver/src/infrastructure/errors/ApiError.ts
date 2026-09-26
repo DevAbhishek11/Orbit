@@ -1,18 +1,12 @@
-/**
- * Typed error taxonomy (BUILD_PROMPT rule 21).
- * Every thrown error in the API is an ApiError carrying a code from the
- * shared catalogue — never a bare Error, never matched on message strings.
- */
 import { ErrorCodeStatus, type ErrorCode } from '@orbit/shared';
 
 export interface ApiErrorOptions {
-  /** Extra machine-readable details (e.g. zod issues, current doc on 409). */
   details?: Record<string, unknown>;
-  /** Override the catalogue status (rare; keep codes canonical). */
+
   status?: number;
-  /** Root cause for logs — never sent to the client. */
+
   cause?: unknown;
-  /** Extra headers (e.g. Retry-After on 429). */
+
   headers?: Record<string, string>;
 }
 
@@ -21,7 +15,7 @@ export class ApiError extends Error {
   readonly status: number;
   readonly details?: Record<string, unknown>;
   readonly headers?: Record<string, string>;
-  /** True when this error is an expected, client-facing outcome (4xx). */
+
   readonly expected: boolean;
 
   constructor(code: ErrorCode, message: string, options: ApiErrorOptions = {}) {
@@ -35,8 +29,6 @@ export class ApiError extends Error {
     Error.captureStackTrace?.(this, ApiError);
   }
 }
-
-// ── Convenience factories (used across modules & tests) ──────────────
 
 export const badRequest = (message = 'Malformed request', details?: Record<string, unknown>) =>
   new ApiError('VALIDATION_ERROR', message, { details, status: 400 });
@@ -55,9 +47,6 @@ export const forbiddenRole = (message = 'Your role does not allow this action') 
 export const forbiddenScope = (message = 'You do not have access to this resource') =>
   new ApiError('FORBIDDEN_SCOPE', message);
 
-/**
- * Cross-tenant reads answer 404 — never 403 (rule 6: no resource enumeration).
- */
 export const notFound = (resource = 'Resource', details?: Record<string, unknown>) =>
   new ApiError('RESOURCE_NOT_FOUND', `${resource} not found`, { details });
 

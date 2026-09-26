@@ -1,9 +1,3 @@
-/**
- * Refresh tokens (BUILD_PROMPT Phase 3):
- *  - only the SHA-256 hash is stored — never the raw token (rule 13)
- *  - familyId links rotations; reuse of a rotated token revokes the family
- *  - TTL index auto-cleans expired rows
- */
 import { Schema, model } from 'mongoose';
 
 export interface IRefreshToken {
@@ -16,7 +10,7 @@ export interface IRefreshToken {
   expiresAt: Date;
   createdAt: Date;
   rotatedAt?: Date | null;
-  replacedBy?: string | null; // hash of the successor token
+  replacedBy?: string | null;
   revokedAt?: Date | null;
   revokedReason?: string | null;
   lastUsedAt?: Date | null;

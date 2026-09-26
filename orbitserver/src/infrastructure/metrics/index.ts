@@ -1,8 +1,3 @@
-/**
- * Prometheus metrics (BUILD_PROMPT Phase 2): HTTP duration/count/in-flight,
- * event-loop lag, memory, cache hit ratio, plus a scrape endpoint guarded by
- * METRICS_TOKEN. All counters are module-scoped singletons.
- */
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import client from 'prom-client';
 import { env } from '../../config/env.js';
@@ -41,21 +36,21 @@ export const eventLoopLag = new client.Gauge({
 export const cacheOpsTotal = new client.Counter({
   name: 'orbit_cache_ops_total',
   help: 'Cache get operations by result',
-  labelNames: ['result'] as const, // hit | miss | error
+  labelNames: ['result'] as const,
   registers: [registry],
 });
 
 export const cacheSetsTotal = new client.Counter({
   name: 'orbit_cache_sets_total',
   help: 'Cache set/invalidation operations',
-  labelNames: ['op'] as const, // set | invalidate
+  labelNames: ['op'] as const,
   registers: [registry],
 });
 
 export const authEventsTotal = new client.Counter({
   name: 'orbit_auth_events_total',
   help: 'Auth lifecycle events',
-  labelNames: ['event'] as const, // login_ok | login_fail | lockout | refresh | reuse_detected | logout
+  labelNames: ['event'] as const,
   registers: [registry],
 });
 
@@ -69,7 +64,7 @@ export const rateLimitHitsTotal = new client.Counter({
 export const dbTransactionTotal = new client.Counter({
   name: 'orbit_db_transactions_total',
   help: 'Multi-document transactions by outcome',
-  labelNames: ['outcome'] as const, // commit | abort | fallback
+  labelNames: ['outcome'] as const,
   registers: [registry],
 });
 

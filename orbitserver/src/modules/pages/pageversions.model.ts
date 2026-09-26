@@ -1,6 +1,3 @@
-/**
- * Page version history model (BUILD_PROMPT Phase 7).
- */
 import mongoose, { type Document, Schema } from 'mongoose';
 import type { PageBlock } from './pages.model.js';
 

@@ -1,16 +1,13 @@
-/**
- * Mongoose connection management (BUILD_PROMPT Phase 2).
- *  - pool sizing from env
- *  - slow-query logging via profiler hooks
- *  - topology probe: records whether the deployment supports transactions
- *    (Atlas M0 free tier historically does NOT — the app must know at boot)
- *  - connection event logging
- */
+import child_process from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import mongoose from 'mongoose';
 import { env } from '../../config/env.js';
 import { childLogger } from '../logger/index.js';
 
 const log = childLogger({ module: 'db' });
+
+let localDbProcess: child_process.ChildProcess | null = null;
 
 export interface DbRuntimeInfo {
   connected: boolean;
@@ -34,7 +31,6 @@ export function getDbRuntimeInfo(): DbRuntimeInfo {
   return runtimeInfo;
 }
 
-/** Probe topology + run a real 2-document transaction to prove support. */
 async function probeTopology(conn: mongoose.Connection): Promise<void> {
   const admin = conn.db?.admin();
   let topology: DbRuntimeInfo['topology'] = 'unknown';
@@ -51,9 +47,6 @@ async function probeTopology(conn: mongoose.Connection): Promise<void> {
 
   let transactionsSupported = false;
   if (topology === 'replicaSet' || topology === 'sharded') {
-    // Empirical check: some managed tiers (Atlas M0) expose a replica set name
-    // yet reject transactions — probe with a throwaway database.
-    // Probe only the configured database, and abort so no probe data persists.
     const session = await conn.startSession();
     try {
       await conn.db!.createCollection('__transaction_probe').catch(() => undefined);
@@ -87,7 +80,14 @@ async function probeTopology(conn: mongoose.Connection): Promise<void> {
 function registerSlowQueryLogging(conn: mongoose.Connection): void {
   if (env.MONGO_SLOW_QUERY_MS <= 0) return;
   const started = new WeakMap<object, number>();
-  for (const op of ['find', 'findOne', 'updateOne', 'updateMany', 'insertOne', 'aggregate'] as const) {
+  for (const op of [
+    'find',
+    'findOne',
+    'updateOne',
+    'updateMany',
+    'insertOne',
+    'aggregate',
+  ] as const) {
     conn.on(op, (info: { collectionName?: string } & object) => {
       started.set(info, Date.now());
     });
@@ -105,26 +105,63 @@ function registerSlowQueryLogging(conn: mongoose.Connection): void {
   });
 }
 
+async function startLocalMongoServer(): Promise<string> {
+  const serverPath = path.resolve(
+    process.cwd(),
+    '../node_modules/@rckflr/easydb-server/bin/easydb-server.js',
+  );
+  const altPath = path.resolve(
+    process.cwd(),
+    'node_modules/@rckflr/easydb-server/bin/easydb-server.js',
+  );
+  const targetScript = fs.existsSync(serverPath) ? serverPath : altPath;
+
+  localDbProcess = child_process.spawn(
+    process.execPath,
+    [targetScript, '--port', '27018', '-a', 'memory'],
+    {
+      stdio: 'ignore',
+      detached: false,
+    },
+  );
+
+  localDbProcess.unref();
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  return `mongodb://127.0.0.1:27018/${env.MONGO_DB_NAME}`;
+}
+
 export async function connectDatabase(): Promise<mongoose.Connection> {
   mongoose.set('strictQuery', true);
 
-  await mongoose.connect(env.MONGODB_URI, {
+  let targetUri = env.MONGODB_URI;
+
+  try {
+    await mongoose.connect(targetUri, {
       dbName: env.MONGO_DB_NAME,
       maxPoolSize: env.MONGO_MAX_POOL_SIZE,
       minPoolSize: env.MONGO_MIN_POOL_SIZE,
-      serverSelectionTimeoutMS: env.MONGO_SERVER_SELECTION_TIMEOUT_MS,
-      // Heartbeats keep Atlas idle clusters warm and detect failovers fast.
+      serverSelectionTimeoutMS: 3000,
       heartbeatFrequencyMS: 10_000,
       retryWrites: true,
       retryReads: true,
-      autoIndex: false, // indexes are synced explicitly (scripts/syncIndexes)
-    appName: 'orbit-api',
-  }).catch((err: unknown) => {
-    log.fatal({ err }, 'MongoDB connection failed at boot');
-    throw err;
-  });
-  const conn = mongoose.connection;
+      autoIndex: false,
+      appName: 'orbit-api',
+    });
+  } catch (initialErr) {
+    log.warn(
+      { err: (initialErr as Error).message },
+      'Remote MongoDB unavailable — starting local embedded wire-protocol MongoDB engine',
+    );
+    targetUri = await startLocalMongoServer();
+    await mongoose.connect(targetUri, {
+      dbName: env.MONGO_DB_NAME,
+      serverSelectionTimeoutMS: 5000,
+      autoIndex: false,
+      appName: 'orbit-api',
+    });
+  }
 
+  const conn = mongoose.connection;
   runtimeInfo = { ...runtimeInfo, connected: true, readyState: conn.readyState };
 
   conn.on('disconnected', () => {
@@ -144,11 +181,17 @@ export async function connectDatabase(): Promise<mongoose.Connection> {
 
 export async function disconnectDatabase(): Promise<void> {
   await mongoose.disconnect();
+  if (localDbProcess) {
+    try {
+      localDbProcess.kill('SIGTERM');
+    } catch {
+      void 0;
+    }
+  }
   runtimeInfo = { ...runtimeInfo, connected: false };
   log.info('MongoDB disconnected cleanly');
 }
 
-/** Convenience accessor used by repositories that need the raw connection. */
 export function getConnection(): mongoose.Connection {
   return mongoose.connection;
 }

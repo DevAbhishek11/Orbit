@@ -1,6 +1,3 @@
-/**
- * Pages repository (BUILD_PROMPT Phase 7).
- */
 import type { ClientSession } from 'mongoose';
 import { PageModel, type PageDoc } from './pages.model.js';
 import { PageVersionModel, type PageVersionDoc } from './pageversions.model.js';
@@ -28,15 +25,14 @@ export async function findPagesByWorkspace(
 
 export async function findPageTree(workspaceId: string): Promise<PageDoc[]> {
   return PageModel.find({ workspaceId, deletedAt: null })
-    .select('_id title icon parentId ancestors depth order visibility favouriteOf createdAt updatedAt')
+    .select(
+      '_id title icon parentId ancestors depth order visibility favouriteOf createdAt updatedAt',
+    )
     .sort({ depth: 1, order: 1 })
     .exec();
 }
 
-export async function createPage(
-  doc: Partial<PageDoc>,
-  session?: ClientSession,
-): Promise<PageDoc> {
+export async function createPage(doc: Partial<PageDoc>, session?: ClientSession): Promise<PageDoc> {
   const [created] = await PageModel.create([doc], { session });
   return created!;
 }
@@ -46,7 +42,11 @@ export async function updatePageById(
   update: Partial<PageDoc> & Record<string, unknown>,
   session?: ClientSession,
 ): Promise<PageDoc | null> {
-  return PageModel.findOneAndUpdate({ _id: id, deletedAt: null }, { $set: update }, { new: true, session }).exec();
+  return PageModel.findOneAndUpdate(
+    { _id: id, deletedAt: null },
+    { $set: update },
+    { new: true, session },
+  ).exec();
 }
 
 export async function softDeleteSubtree(
@@ -55,7 +55,7 @@ export async function softDeleteSubtree(
   session?: ClientSession,
 ): Promise<number> {
   const now = new Date();
-  // Delete root page + any descendants that have pageId in their ancestors
+
   const res = await PageModel.updateMany(
     {
       workspaceId,

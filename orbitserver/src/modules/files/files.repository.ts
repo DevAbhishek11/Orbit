@@ -1,6 +1,3 @@
-/**
- * Files repository.
- */
 import type { ClientSession } from 'mongoose';
 import { FileModel, type FileDoc } from './files.model.js';
 

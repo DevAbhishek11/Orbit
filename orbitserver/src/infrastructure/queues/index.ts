@@ -1,12 +1,3 @@
-/**
- * Queue facade (BUILD_PROMPT Phase 10 — 9 queues + DLQ).
- *
- * - With QUEUE_DISABLED=true: inline handlers (dev/test)
- * - With QUEUE_DISABLED=false: BullMQ backed by redis-queue (noeviction+AOF)
- * - Payloads carry IDs, never documents
- * - Dedupe via deterministic jobId (sha256 of dedupeKey)
- * - Default: attempts 5, exponential backoff 2s, removeOnComplete 24h/1000
- */
 import crypto from 'node:crypto';
 import { Queue, type JobsOptions } from 'bullmq';
 import { childLogger } from '../logger/index.js';
@@ -33,13 +24,11 @@ export type QueueName = (typeof QueueNames)[number];
 type JobHandler = (data: Record<string, unknown>) => Promise<void>;
 const inlineHandlers = new Map<string, JobHandler>();
 
-/** Register an in-process handler (used when QUEUE_DISABLED=true, and by tests). */
 export function registerInlineHandler(queue: QueueName, name: string, handler: JobHandler): void {
   inlineHandlers.set(`${queue}:${name}`, handler);
 }
 
 export interface EnqueueOptions {
-  /** Deterministic dedupe key — identical keys collapse into one job. */
   dedupeKey?: string;
   delayMs?: number;
   jobId?: string;
@@ -80,17 +69,12 @@ function buildJobId(dedupeKey?: string): string | undefined {
   return crypto.createHash('sha256').update(dedupeKey).digest('hex').slice(0, 32);
 }
 
-/**
- * Enqueue a job. Fire-and-forget for callers: a queue outage must never fail
- * the request path (failure mode #4 → 503 only when spec demands it).
- */
 export async function enqueue(
   queue: QueueName,
   name: string,
   data: Record<string, unknown>,
   options: EnqueueOptions = {},
 ): Promise<void> {
-  // Inline path (dev/test default)
   if (env.QUEUE_DISABLED) {
     const handler = inlineHandlers.get(`${queue}:${name}`);
     if (handler) {
@@ -100,16 +84,17 @@ export async function enqueue(
         log.error({ err, queue, name }, 'inline job handler failed');
       }
     } else {
-      log.debug({ queue, name, data, dedupeKey: options.dedupeKey }, 'job enqueued (inline stub — no handler)');
+      log.debug(
+        { queue, name, data, dedupeKey: options.dedupeKey },
+        'job enqueued (inline stub — no handler)',
+      );
     }
     return;
   }
 
-  // BullMQ path
   try {
     const bullQueue = getOrCreateBullQueue(queue);
     if (!bullQueue) {
-      // Fallback to inline if redis unavailable
       const handler = inlineHandlers.get(`${queue}:${name}`);
       if (handler) {
         await handler(data).catch((err) => {
@@ -127,13 +112,13 @@ export async function enqueue(
     await bullQueue.add(name, data, jobOptions);
     log.debug({ queue, name, jobId }, 'job enqueued to bullmq');
   } catch (err) {
-    log.error({ err: (err as Error).message, queue, name }, 'failed to enqueue job — swallowed to protect request path');
-    // Failure mode #4: if queue is critical and buffer >500, caller may want 503
-    // For now we swallow to keep request path healthy
+    log.error(
+      { err: (err as Error).message, queue, name },
+      'failed to enqueue job — swallowed to protect request path',
+    );
   }
 }
 
-/** Helper for idempotent enqueue with deterministic dedupe */
 export async function enqueueOnce(
   queue: QueueName,
   name: string,
@@ -148,9 +133,7 @@ export async function closeAllQueues(): Promise<void> {
     try {
       await queue.close();
       log.info({ queue: name }, 'bullmq queue closed');
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
   bullQueues.clear();
 }

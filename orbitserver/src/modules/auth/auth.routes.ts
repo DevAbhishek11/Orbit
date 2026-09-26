@@ -1,8 +1,3 @@
-/**
- * Auth routes — 8 endpoints + session management (BUILD_PROMPT Phase 3).
- * Every route sits on the `auth` rate-limit tier (fail-CLOSED) keyed by
- * ip+email so credential stuffing gets throttled hard.
- */
 import { Router } from 'express';
 import { env } from '../../config/env.js';
 import { idempotency } from '../../middleware/idempotency.js';
@@ -69,7 +64,12 @@ authRouter.post(
   controller.resetPassword,
 );
 
-authRouter.post('/verify-email', ipRateLimit, validate({ body: verifyEmailSchema }), controller.verifyEmail);
+authRouter.post(
+  '/verify-email',
+  ipRateLimit,
+  validate({ body: verifyEmailSchema }),
+  controller.verifyEmail,
+);
 
 authRouter.post(
   '/switch-workspace',

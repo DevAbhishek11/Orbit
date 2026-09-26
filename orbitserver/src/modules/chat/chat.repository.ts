@@ -1,6 +1,3 @@
-/**
- * Chat repository (BUILD_PROMPT Phase 8).
- */
 import type { ClientSession } from 'mongoose';
 import { ChannelModel, type ChannelDoc } from './channels.model.js';
 import { MessageModel, type MessageDoc } from './messages.model.js';
@@ -10,7 +7,10 @@ export async function findChannelById(id: string): Promise<ChannelDoc | null> {
   return ChannelModel.findOne({ _id: id, deletedAt: null }).exec();
 }
 
-export async function findChannelByIdScoped(id: string, workspaceId: string): Promise<ChannelDoc | null> {
+export async function findChannelByIdScoped(
+  id: string,
+  workspaceId: string,
+): Promise<ChannelDoc | null> {
   return ChannelModel.findOne({ _id: id, workspaceId, deletedAt: null }).exec();
 }
 
@@ -40,7 +40,11 @@ export async function updateChannelById(
   update: Partial<ChannelDoc>,
   session?: ClientSession,
 ): Promise<ChannelDoc | null> {
-  return ChannelModel.findOneAndUpdate({ _id: id, deletedAt: null }, { $set: update }, { new: true, session }).exec();
+  return ChannelModel.findOneAndUpdate(
+    { _id: id, deletedAt: null },
+    { $set: update },
+    { new: true, session },
+  ).exec();
 }
 
 export async function findMessageById(id: string): Promise<MessageDoc | null> {
@@ -67,10 +71,7 @@ export async function findMessagesByChannel(
   return MessageModel.find(query).sort({ createdAt: -1 }).limit(limit).exec();
 }
 
-export async function findThreadMessages(
-  threadRootId: string,
-  limit = 100,
-): Promise<MessageDoc[]> {
+export async function findThreadMessages(threadRootId: string, limit = 100): Promise<MessageDoc[]> {
   return MessageModel.find({
     $or: [{ _id: threadRootId }, { threadRootId }],
     deletedAt: null,
@@ -93,7 +94,11 @@ export async function updateMessageById(
   update: Partial<MessageDoc>,
   session?: ClientSession,
 ): Promise<MessageDoc | null> {
-  return MessageModel.findOneAndUpdate({ _id: id, deletedAt: null }, { $set: update }, { new: true, session }).exec();
+  return MessageModel.findOneAndUpdate(
+    { _id: id, deletedAt: null },
+    { $set: update },
+    { new: true, session },
+  ).exec();
 }
 
 export async function updateChannelRead(

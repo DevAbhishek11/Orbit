@@ -1,13 +1,3 @@
-/**
- * Cache service on redis-cache (BUILD_PROMPT phases 4/11):
- *  - namespaced keys with a shared prefix
- *  - TAG-based invalidation (board:{id}, ws:{id}, channel:{id}, …)
- *  - stale-while-revalidate entries ({v, exp, swr} payloads)
- *  - single-flight locks so a stampede of misses triggers ONE loader call
- *
- * Every method degrades to "cache miss" when Redis is unhealthy — losing the
- * cache costs latency, never correctness (failure mode #3).
- */
 import { childLogger } from '../logger/index.js';
 import { getCacheClient } from '../redis/cacheClient.js';
 import { cacheOpsTotal, cacheSetsTotal } from '../metrics/index.js';
@@ -17,20 +7,20 @@ const log = childLogger({ module: 'cache' });
 
 interface CacheRecord<T> {
   v: T;
-  /** Fresh-until epoch ms; after this the entry is stale-but-servable. */
+
   exp: number;
-  /** Stale-until epoch ms (SWR window end). */
+
   swr: number;
-  /** Tags registered with this key for grouped invalidation. */
+
   tags: string[];
 }
 
 export interface GetOrSetOptions {
   ttlSeconds?: number;
-  /** Serve stale for this long while refreshing in the background. */
+
   swrSeconds?: number;
   tags?: string[];
-  /** Single-flight lock TTL while the loader runs. */
+
   lockTtlSeconds?: number;
 }
 
@@ -56,7 +46,7 @@ export async function cacheGet<T>(key: string): Promise<{ value: T; stale: boole
     const now = Date.now();
     if (now > record.swr) {
       cacheOpsTotal.inc({ result: 'miss' });
-      return null; // beyond SWR — treat as absent
+      return null;
     }
     cacheOpsTotal.inc({ result: 'hit' });
     return { value: record.v, stale: now > record.exp };
@@ -67,14 +57,23 @@ export async function cacheGet<T>(key: string): Promise<{ value: T; stale: boole
   }
 }
 
-export async function cacheSet<T>(key: string, value: T, options: GetOrSetOptions = {}): Promise<void> {
+export async function cacheSet<T>(
+  key: string,
+  value: T,
+  options: GetOrSetOptions = {},
+): Promise<void> {
   if (!env.CACHE_ENABLED) return;
   const client = getCacheClient();
   if (!client) return;
   const ttl = options.ttlSeconds ?? env.REDIS_CACHE_TTL_DEFAULT;
   const swr = options.swrSeconds ?? 0;
   const now = Date.now();
-  const record: CacheRecord<T> = { v: value, exp: now + ttl * 1000, swr: now + (ttl + swr) * 1000, tags: options.tags ?? [] };
+  const record: CacheRecord<T> = {
+    v: value,
+    exp: now + ttl * 1000,
+    swr: now + (ttl + swr) * 1000,
+    tags: options.tags ?? [],
+  };
   try {
     const pipeline = client.pipeline();
     pipeline.set(fullKey(key), JSON.stringify(record), 'EX', ttl + swr);
@@ -89,7 +88,6 @@ export async function cacheSet<T>(key: string, value: T, options: GetOrSetOption
   }
 }
 
-/** Invalidate a single key. */
 export async function cacheDel(key: string): Promise<void> {
   const client = getCacheClient();
   if (!client) return;
@@ -101,10 +99,6 @@ export async function cacheDel(key: string): Promise<void> {
   }
 }
 
-/**
- * Invalidate every key registered under a tag (e.g. `board:{id}` after a move).
- * Emits happen AFTER the DB commit — never inside a transaction.
- */
 export async function invalidateTag(tag: string): Promise<void> {
   const client = getCacheClient();
   if (!client) return;
@@ -122,13 +116,6 @@ export async function invalidateTag(tag: string): Promise<void> {
   }
 }
 
-/**
- * Read-through with SWR + single-flight stampede protection:
- *  - fresh hit → serve
- *  - stale hit → serve stale, refresh in background (exactly one refresher)
- *  - miss → acquire a short lock; winner loads + stores; losers poll briefly
- *    then fall through to loading directly (lock holder may have died).
- */
 export async function getOrSet<T>(
   key: string,
   loader: () => Promise<T>,
@@ -147,9 +134,7 @@ export async function getOrSet<T>(
   const lockKey = `lock:${key}`;
   const lockTtl = options.lockTtlSeconds ?? 10;
   for (let attempt = 0; attempt < 3; attempt++) {
-    const won = await client
-      .set(lockKey, '1', 'EX', lockTtl, 'NX')
-      .catch(() => null);
+    const won = await client.set(lockKey, '1', 'EX', lockTtl, 'NX').catch(() => null);
     if (won === 'OK') {
       try {
         const value = await loader();
@@ -159,12 +144,12 @@ export async function getOrSet<T>(
         await client.del(lockKey).catch(() => undefined);
       }
     }
-    // Another request is loading — give it a moment, then re-check the cache.
+
     await sleep(50 * (attempt + 1));
     const retried = await cacheGet<T>(key);
     if (retried) return retried.value;
   }
-  // Lock holder vanished or is too slow — load directly (correctness first).
+
   const value = await loader();
   await cacheSet(key, value, options);
   return value;
@@ -189,7 +174,6 @@ async function refreshInBackground<T>(
   }
 }
 
-/** Test hook: reset the in-flight refresh set. */
 export function __resetCacheInternals(): void {
   refreshing = new Set();
 }

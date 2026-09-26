@@ -1,6 +1,4 @@
-/**
- * Files controller — HTTP plumbing only.
- */
+import fs from 'node:fs';
 import type { Request, Response } from 'express';
 import { created, noContent, ok } from '../../infrastructure/http/response.js';
 import { requireAuth } from '../../middleware/authenticate.js';
@@ -65,17 +63,36 @@ export async function deleteFile(req: Request, res: Response): Promise<void> {
   noContent(res);
 }
 
-export async function rawUploadPlaceholder(req: Request, res: Response): Promise<void> {
-  // In dev, this endpoint accepts raw upload and immediately confirms
-  // In production, uploads go directly to S3 via presigned URL
+export async function rawUpload(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const file = await service.confirmUpload(String(req.params.id), auth.workspaceId!);
+  const file = await service.saveLocalFileStream(auth.workspaceId!, String(req.params.id), req);
   ok(res, {
     file: {
       id: file._id.toString(),
       fileName: file.originalName,
       status: file.status,
     },
-    message: 'File upload confirmed (dev mode — S3 presign bypassed)',
+    message: 'File uploaded and saved to local storage',
   });
+}
+
+export async function downloadFile(req: Request, res: Response): Promise<void> {
+  const auth = requireAuth(req);
+  const { filePath, file } = await service.getLocalFilePath(
+    auth.workspaceId!,
+    String(req.params.id),
+  );
+
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ error: 'File content not found on server' });
+    return;
+  }
+
+  res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${encodeURIComponent(file.originalName)}"`,
+  );
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
 }

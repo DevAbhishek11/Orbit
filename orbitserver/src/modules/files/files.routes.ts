@@ -1,6 +1,3 @@
-/**
- * Files routes (BUILD_PROMPT Phase 11 — S3 presign flow).
- */
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import { authorize } from '../../middleware/authorize.js';
@@ -33,6 +30,13 @@ filesRouter.post(
 );
 
 filesRouter.get(
+  '/files/:id/download',
+  validate({ params: fileParamsSchema }),
+  authorize('board:read', {}),
+  controller.downloadFile,
+);
+
+filesRouter.get(
   '/files/:id',
   validate({ params: fileParamsSchema }),
   authorize('board:read', {}),
@@ -47,11 +51,10 @@ filesRouter.delete(
   controller.deleteFile,
 );
 
-// Dev-only raw upload placeholder (bypasses S3)
 filesRouter.post(
   '/files/:id/raw',
   uploadLimit,
   validate({ params: fileParamsSchema }),
   authorize('file:upload', {}),
-  controller.rawUploadPlaceholder,
+  controller.rawUpload,
 );

@@ -1,6 +1,3 @@
-/**
- * Invitations (BUILD_PROMPT Phase 5): single-use, hashed at rest, 72 h TTL.
- */
 import { Schema, model } from 'mongoose';
 import type { Role } from '@orbit/shared';
 
@@ -31,7 +28,11 @@ const invitationSchema = new Schema<IInvitation>(
     acceptedAt: { type: Date, default: null },
     declinedAt: { type: Date, default: null },
   },
-  { collection: 'invitations', timestamps: { createdAt: true, updatedAt: false }, versionKey: false },
+  {
+    collection: 'invitations',
+    timestamps: { createdAt: true, updatedAt: false },
+    versionKey: false,
+  },
 );
 
 invitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

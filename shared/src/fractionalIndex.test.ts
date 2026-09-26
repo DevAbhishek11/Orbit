@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   MAX_ORDER_KEY_LENGTH,
   decrementKey,
@@ -8,9 +8,8 @@ import {
   isBefore,
   isValidOrderKey,
   keyBetween,
-} from './fractionalIndex.js';
+} from "./fractionalIndex.js";
 
-/** Deterministic PRNG (mulberry32) so property tests are reproducible. */
 function makeRng(seed: number): () => number {
   let t = seed >>> 0;
   return () => {
@@ -21,13 +20,13 @@ function makeRng(seed: number): () => number {
   };
 }
 
-describe('fractionalIndex', () => {
-  it('produces the middle key for an empty list', () => {
-    expect(firstKey()).toBe('V');
+describe("fractionalIndex", () => {
+  it("produces the middle key for an empty list", () => {
+    expect(firstKey()).toBe("V");
     expect(isValidOrderKey(firstKey())).toBe(true);
   });
 
-  it('generates strictly increasing keys when appending', () => {
+  it("generates strictly increasing keys when appending", () => {
     let prev: string | null = null;
     const keys: string[] = [];
     for (let i = 0; i < 200; i++) {
@@ -40,7 +39,7 @@ describe('fractionalIndex', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('generates strictly decreasing keys when prepending', () => {
+  it("generates strictly decreasing keys when prepending", () => {
     let next: string | null = null;
     const keys: string[] = [];
     for (let i = 0; i < 200; i++) {
@@ -53,8 +52,8 @@ describe('fractionalIndex', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('always lands strictly between neighbours and exhausts the gap eventually', () => {
-    const a = 'V';
+  it("always lands strictly between neighbours and exhausts the gap eventually", () => {
+    const a = "V";
     let b = incrementKey(a);
     let squeezed = 0;
     let exhausted = false;
@@ -63,7 +62,6 @@ describe('fractionalIndex', () => {
       try {
         mid = keyBetween(a, b);
       } catch (err) {
-        // The ONLY legal failure is gap exhaustion after ≤ MAX length keys.
         expect((err as Error).message).toMatch(/exhausted/);
         expect(b.length).toBeGreaterThan(MAX_ORDER_KEY_LENGTH - 3);
         exhausted = true;
@@ -72,30 +70,30 @@ describe('fractionalIndex', () => {
       expect(isBefore(a, mid)).toBe(true);
       expect(isBefore(mid, b)).toBe(true);
       expect(isValidOrderKey(mid)).toBe(true);
-      b = mid; // keep squeezing the same gap
+      b = mid;
       squeezed++;
     }
-    expect(exhausted).toBe(true); // a squeezed gap MUST report exhaustion, not corrupt
+    expect(exhausted).toBe(true);
     expect(squeezed).toBeGreaterThan(20);
-    // After exhaustion, the rebalance path restores ordering.
+
     const rebalanced = evenKeys(squeezed + 2);
     for (let i = 1; i < rebalanced.length; i++) {
       expect(isBefore(rebalanced[i - 1]!, rebalanced[i]!)).toBe(true);
     }
   });
 
-  it('increment/decrement helpers agree with keyBetween', () => {
-    expect(incrementKey('V')).toBe(keyBetween('V', null));
-    expect(decrementKey('V')).toBe(keyBetween(null, 'V'));
+  it("increment/decrement helpers agree with keyBetween", () => {
+    expect(incrementKey("V")).toBe(keyBetween("V", null));
+    expect(decrementKey("V")).toBe(keyBetween(null, "V"));
   });
 
-  it('rejects out-of-order and equal neighbours', () => {
-    expect(() => keyBetween('b', 'a')).toThrow(/out of order/);
-    expect(() => keyBetween('a', 'a')).toThrow(/equal neighbours/);
-    expect(() => keyBetween('bad key!', null)).toThrow(/invalid/);
+  it("rejects out-of-order and equal neighbours", () => {
+    expect(() => keyBetween("b", "a")).toThrow(/out of order/);
+    expect(() => keyBetween("a", "a")).toThrow(/equal neighbours/);
+    expect(() => keyBetween("bad key!", null)).toThrow(/invalid/);
   });
 
-  it('evenKeys returns sorted, unique, valid keys for rebalance', () => {
+  it("evenKeys returns sorted, unique, valid keys for rebalance", () => {
     for (const n of [0, 1, 2, 5, 20, 100, 500]) {
       const keys = evenKeys(n);
       expect(keys).toHaveLength(n);
@@ -106,7 +104,7 @@ describe('fractionalIndex', () => {
     }
   });
 
-  it('property: 10k random insert sequences always sort correctly and never collide', () => {
+  it("property: 10k random insert sequences always sort correctly and never collide", () => {
     const rng = makeRng(1337);
     const list: string[] = [];
     const seen = new Set<string>();
@@ -120,7 +118,6 @@ describe('fractionalIndex', () => {
       try {
         key = keyBetween(prev, next);
       } catch {
-        // Only legal failure: exhausted gap length → rebalance and continue.
         const rebalanced = evenKeys(list.length + 1);
         list.length = 0;
         seen.clear();
@@ -132,19 +129,19 @@ describe('fractionalIndex', () => {
       expect(seen.has(key)).toBe(false);
       seen.add(key);
       list.splice(pos, 0, key);
-      // O(1) local invariant every step — neighbours must stay ordered.
+
       if (pos > 0) expect(isBefore(list[pos - 1]!, key)).toBe(true);
-      if (pos < list.length - 1) expect(isBefore(key, list[pos + 1]!)).toBe(true);
-      // Full sort invariant periodically (cheap enough, catches global drift).
+      if (pos < list.length - 1)
+        expect(isBefore(key, list[pos + 1]!)).toBe(true);
+
       if (step % 500 === 499) expect([...list].sort()).toEqual(list);
     }
     expect([...list].sort()).toEqual(list);
     expect(list.length).toBeGreaterThan(9_000);
-    expect(rebalances).toBeLessThan(50); // random inserts rarely exhaust gaps
+    expect(rebalances).toBeLessThan(50);
   });
 
-  it('canonical keys never end in 0 (append + prepend sequences)', () => {
-    // Appending: on exhaustion the rebalance path must also stay canonical.
+  it("canonical keys never end in 0 (append + prepend sequences)", () => {
     let last: string | null = null;
     for (let i = 0; i < 400; i++) {
       let next: string;
@@ -152,23 +149,23 @@ describe('fractionalIndex', () => {
         next = keyBetween(last, null);
       } catch {
         const rebalanced = evenKeys(50);
-        for (const k of rebalanced) expect(k.endsWith('0')).toBe(false);
+        for (const k of rebalanced) expect(k.endsWith("0")).toBe(false);
         next = rebalanced[rebalanced.length - 1]!;
       }
-      expect(next.endsWith('0')).toBe(false);
+      expect(next.endsWith("0")).toBe(false);
       expect(isValidOrderKey(next)).toBe(true);
       last = next;
     }
-    // Prepending.
+
     let first: string | null = null;
     for (let i = 0; i < 400; i++) {
       let prev: string;
       try {
         prev = keyBetween(null, first);
       } catch {
-        break; // exhaustion is legal; rebalance covered above
+        break;
       }
-      expect(prev.endsWith('0')).toBe(false);
+      expect(prev.endsWith("0")).toBe(false);
       first = prev;
     }
   });

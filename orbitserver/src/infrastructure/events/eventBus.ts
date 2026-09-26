@@ -1,8 +1,3 @@
-/**
- * Post-commit event bus (BUILD_PROMPT Phase 9):
- * Delegates to realtime socket server when available, otherwise logs.
- * Services MUST call emitSafe AFTER transaction commits — never inside it.
- */
 import { childLogger } from '../logger/index.js';
 import { getRequestContext } from '../logger/requestContext.js';
 
@@ -17,12 +12,12 @@ export type SocketRoom =
   | `typing:${string}`;
 
 export interface EmitPayload {
-  /** Echoed so the acting client can ignore its own event. */
   clientMutationId?: string;
   [key: string]: unknown;
 }
 
-let emitImpl: ((room: string, event: string, payload: Record<string, unknown>) => void) | null = null;
+let emitImpl: ((room: string, event: string, payload: Record<string, unknown>) => void) | null =
+  null;
 
 export function setEmitImplementation(
   impl: (room: string, event: string, payload: Record<string, unknown>) => void,
@@ -36,7 +31,6 @@ export function emitSafe(room: SocketRoom, event: string, payload: EmitPayload =
     if (emitImpl) {
       emitImpl(room, event, payload);
     } else {
-      // Lazy import to avoid circular deps — fallback to dynamic socket server
       import('../../realtime/socket.server.js')
         .then((mod) => {
           mod.emitSafe(room, event, payload);
@@ -46,6 +40,9 @@ export function emitSafe(room: SocketRoom, event: string, payload: EmitPayload =
         });
     }
   } catch (err) {
-    log.warn({ err: (err as Error).message, room, event, requestId: ctx.requestId }, 'emitSafe failed — swallowed');
+    log.warn(
+      { err: (err as Error).message, room, event, requestId: ctx.requestId },
+      'emitSafe failed — swallowed',
+    );
   }
 }

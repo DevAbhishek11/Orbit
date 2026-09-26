@@ -1,14 +1,3 @@
-/**
- * Auth + workspace session state.
- *
- * Boot order: ask the API who we are (`GET /users/me`). The HTTP client
- * transparently refreshes an expired access token from the httpOnly cookie, so
- * a reload restores the session without the user re-typing anything.
- *
- * The access token is workspace-scoped (`wid` claim), so the last-used
- * workspace is persisted and re-applied with `POST /auth/switch-workspace`
- * when it differs from what the fresh token carries.
- */
 import {
   createContext,
   useCallback,
@@ -18,15 +7,15 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { ApiError, setAccessToken, setSessionHooks } from '../api/client';
-import { authApi, usersApi, workspacesApi } from '../api/endpoints';
-import type { Role, User, Workspace } from '../api/types';
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ApiError, setAccessToken, setSessionHooks } from "../api/client";
+import { authApi, usersApi, workspacesApi } from "../api/endpoints";
+import type { Role, User, Workspace } from "../api/types";
 
-const WORKSPACE_KEY = 'orbit.workspaceId';
+const WORKSPACE_KEY = "orbit.workspaceId";
 
-type Status = 'loading' | 'anonymous' | 'authenticated';
+type Status = "loading" | "anonymous" | "authenticated";
 
 interface AuthContextValue {
   status: Status;
@@ -37,7 +26,12 @@ interface AuthContextValue {
   role: Role | null;
   bootError: string | null;
   signIn: (email: string, password: string, remember: boolean) => Promise<void>;
-  signUp: (input: { email: string; password: string; name: string; handle?: string }) => Promise<void>;
+  signUp: (input: {
+    email: string;
+    password: string;
+    name: string;
+    handle?: string;
+  }) => Promise<void>;
   signOut: (allDevices: boolean) => Promise<void>;
   selectWorkspace: (workspaceId: string) => Promise<void>;
   refreshWorkspaces: () => Promise<Workspace[]>;
@@ -48,17 +42,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function useAuth(): AuthContextValue {
   const value = useContext(AuthContext);
-  if (!value) throw new Error('useAuth must be used inside <AuthProvider>');
+  if (!value) throw new Error("useAuth must be used inside <AuthProvider>");
   return value;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<Status>('loading');
+  const [status, setStatus] = useState<Status>("loading");
   const [user, setUser] = useState<User | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(
-    () => localStorage.getItem(WORKSPACE_KEY),
+  const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
+    localStorage.getItem(WORKSPACE_KEY),
   );
   const [role, setRole] = useState<Role | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -70,9 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return list;
   }, []);
 
-  /** Apply a successful auth result (login, register, refresh, switch). */
   const applyAuth = useCallback(
-    async (next: { user: User; accessToken: string; workspaceId: string | null; role: Role | null }) => {
+    async (next: {
+      user: User;
+      accessToken: string;
+      workspaceId: string | null;
+      role: Role | null;
+    }) => {
       setAccessToken(next.accessToken);
       setUser(next.user);
       if (next.workspaceId) {
@@ -80,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(WORKSPACE_KEY, next.workspaceId);
       }
       setRole(next.role ?? null);
-      setStatus('authenticated');
+      setStatus("authenticated");
     },
     [],
   );
@@ -93,11 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setWorkspaceId(null);
     setRole(null);
     localStorage.removeItem(WORKSPACE_KEY);
-    setStatus('anonymous');
+    setStatus("anonymous");
   }, [queryClient]);
 
-  // Background refreshes (triggered by a 401 deep inside a query) must update
-  // the same state, otherwise the UI keeps showing a stale/absent user.
   useEffect(() => {
     setSessionHooks({
       onRefreshed: (auth) => {
@@ -107,16 +103,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(WORKSPACE_KEY, auth.workspaceId);
         }
         setRole((auth.role as Role | null) ?? null);
-        setStatus('authenticated');
+        setStatus("authenticated");
       },
       onLost: () => {
-        setStatus((current) => (current === 'authenticated' ? 'anonymous' : current));
+        setStatus((current) =>
+          current === "authenticated" ? "anonymous" : current,
+        );
         setUser(null);
       },
     });
   }, []);
 
-  // ── Boot ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
@@ -128,30 +125,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const list = await loadWorkspaces();
 
         const remembered = localStorage.getItem(WORKSPACE_KEY);
-        const tokenWorkspace = list.find((w) => w.id === remembered) ? remembered : null;
+        const tokenWorkspace = list.find((w) => w.id === remembered)
+          ? remembered
+          : null;
         const target = tokenWorkspace ?? list[0]?.id ?? null;
 
         if (!target) {
           setWorkspaceId(null);
           setRole(null);
-          setStatus('authenticated');
+          setStatus("authenticated");
           return;
         }
 
-        // Make sure the access token is scoped to the workspace we will render.
         const scope = await authApi.switchWorkspace(target);
         setAccessToken(scope.accessToken);
         setWorkspaceId(scope.workspaceId);
         setRole(scope.role);
         localStorage.setItem(WORKSPACE_KEY, scope.workspaceId);
-        setStatus('authenticated');
+        setStatus("authenticated");
       } catch (err) {
-        if (err instanceof ApiError && (err.status === 401 || err.code === 'UNAUTHENTICATED')) {
-          setStatus('anonymous');
+        if (
+          err instanceof ApiError &&
+          (err.status === 401 || err.code === "UNAUTHENTICATED")
+        ) {
+          setStatus("anonymous");
           return;
         }
-        setBootError(err instanceof Error ? err.message : 'Could not reach the Orbit API');
-        setStatus('anonymous');
+        setBootError(
+          err instanceof Error ? err.message : "Could not reach the Orbit API",
+        );
+        setStatus("anonymous");
       }
     })();
   }, [loadWorkspaces]);
@@ -166,7 +169,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signUp = useCallback(
-    async (input: { email: string; password: string; name: string; handle?: string }) => {
+    async (input: {
+      email: string;
+      password: string;
+      name: string;
+      handle?: string;
+    }) => {
       const result = await authApi.register(input);
       await applyAuth(result);
       await loadWorkspaces();
@@ -185,16 +193,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [clearSession],
   );
 
-  const selectWorkspace = useCallback(
-    async (nextWorkspaceId: string) => {
-      const scope = await authApi.switchWorkspace(nextWorkspaceId);
-      setAccessToken(scope.accessToken);
-      setWorkspaceId(scope.workspaceId);
-      setRole(scope.role);
-      localStorage.setItem(WORKSPACE_KEY, scope.workspaceId);
-    },
-    [],
-  );
+  const selectWorkspace = useCallback(async (nextWorkspaceId: string) => {
+    const scope = await authApi.switchWorkspace(nextWorkspaceId);
+    setAccessToken(scope.accessToken);
+    setWorkspaceId(scope.workspaceId);
+    setRole(scope.role);
+    localStorage.setItem(WORKSPACE_KEY, scope.workspaceId);
+  }, []);
 
   const workspace = useMemo(
     () => workspaces.find((w) => w.id === workspaceId) ?? null,
@@ -217,7 +222,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshWorkspaces: loadWorkspaces,
       setUser,
     }),
-    [status, user, workspaces, workspaceId, workspace, role, bootError, signIn, signUp, signOut, selectWorkspace, loadWorkspaces],
+    [
+      status,
+      user,
+      workspaces,
+      workspaceId,
+      workspace,
+      role,
+      bootError,
+      signIn,
+      signUp,
+      signOut,
+      selectWorkspace,
+      loadWorkspaces,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

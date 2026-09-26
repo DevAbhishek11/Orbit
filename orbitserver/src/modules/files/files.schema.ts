@@ -1,6 +1,3 @@
-/**
- * Zod validation schemas for Files module.
- */
 import { z } from 'zod';
 
 export const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ObjectId');
@@ -8,7 +5,11 @@ export const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ObjectId'
 export const presignSchema = z.object({
   fileName: z.string().trim().min(1).max(255),
   mimeType: z.string().min(1).max(100),
-  size: z.number().int().min(1).max(100 * 1024 * 1024), // 100MB max
+  size: z
+    .number()
+    .int()
+    .min(1)
+    .max(100 * 1024 * 1024),
   entityType: z.enum(['card', 'page', 'message']).optional(),
   entityId: objectId.optional(),
 });

@@ -1,8 +1,3 @@
-/**
- * User routes — the signed-in user's own profile.
- * Self-service only: role/status live on the workspace membership and are
- * changed through /workspaces/:wid/members/:userId instead.
- */
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import { rateLimit } from '../../middleware/rateLimit.js';
