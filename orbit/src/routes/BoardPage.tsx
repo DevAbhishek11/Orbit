@@ -7,24 +7,39 @@ import {
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  CalendarDays,
+  CheckSquare,
+  GripVertical,
+  MessageSquare,
+  Paperclip,
+  Plus,
+  Settings,
+  Trash2,
+  X,
+} from "lucide-react";
 import { ApiError } from "../api/client";
 import { boardsApi, cardsApi } from "../api/endpoints";
 import type { BoardView, Card } from "../api/types";
-import { useAuth } from "../state/auth";
-import { useToast } from "../state/toast";
 import { CardModal } from "../components/CardModal";
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { useSocket } from "../state/socket";
 import {
+  Avatar,
   Badge,
+  Button,
   CenterState,
   ConfirmDialog,
   EmptyState,
   ErrorBox,
   Field,
+  Input,
   Modal,
-  Spinner,
+  Textarea,
 } from "../components/ui";
+import { useAuth } from "../state/auth";
+import { useSocket } from "../state/socket";
+import { useToast } from "../state/toast";
 
 interface DragCard {
   cardId: string;
@@ -35,6 +50,13 @@ interface DropTarget {
   listId: string;
   index: number;
 }
+
+const PRIORITY_TONE = {
+  urgent: "danger",
+  high: "warning",
+  medium: "info",
+  low: "default",
+} as const;
 
 export function BoardPage() {
   const { boardId = "" } = useParams();
@@ -68,67 +90,51 @@ export function BoardPage() {
     const room = `board:${boardId}`;
     void joinRoom(room).catch(() => undefined);
 
-    const onCardMoved = () => {
-      void queryClient.invalidateQueries({ queryKey: ["board", boardId] });
-    };
-    const onCardUpdated = () => {
-      void queryClient.invalidateQueries({ queryKey: ["board", boardId] });
-    };
-    const onCardCreated = () => {
-      void queryClient.invalidateQueries({ queryKey: ["board", boardId] });
-    };
-    const onCardDeleted = () => {
+    const refresh = () => {
       void queryClient.invalidateQueries({ queryKey: ["board", boardId] });
     };
 
-    socket.on("card:moved", onCardMoved);
-    socket.on("card:updated", onCardUpdated);
-    socket.on("card:created", onCardCreated);
-    socket.on("card:deleted", onCardDeleted);
-    socket.on("list:reordered", onCardMoved);
-    socket.on("list:rebalanced", onCardMoved);
+    socket.on("card:moved", refresh);
+    socket.on("card:updated", refresh);
+    socket.on("card:created", refresh);
+    socket.on("card:deleted", refresh);
+    socket.on("list:reordered", refresh);
+    socket.on("list:rebalanced", refresh);
 
     return () => {
-      socket.off("card:moved", onCardMoved);
-      socket.off("card:updated", onCardUpdated);
-      socket.off("card:created", onCardCreated);
-      socket.off("card:deleted", onCardDeleted);
-      socket.off("list:reordered", onCardMoved);
-      socket.off("list:rebalanced", onCardMoved);
+      socket.off("card:moved", refresh);
+      socket.off("card:updated", refresh);
+      socket.off("card:created", refresh);
+      socket.off("card:deleted", refresh);
+      socket.off("list:reordered", refresh);
+      socket.off("list:rebalanced", refresh);
       void leaveRoom(room).catch(() => undefined);
     };
   }, [socket, boardId, joinRoom, leaveRoom, queryClient]);
 
-  const applyLocalMove = (
-    cardId: string,
-    toListId: string,
-    index: number,
-    movedCard?: Card,
-  ) => {
+  const applyLocalMove = (cardId: string, toListId: string, index: number) => {
     queryClient.setQueryData<BoardView>(["board", boardId], (current) => {
       if (!current) return current;
-      let moving = movedCard;
+      let moving: Card | undefined;
       const lists = current.lists.map((list) => {
         const without = list.cards.filter((card) => card.id !== cardId);
         if (!moving) moving = list.cards.find((card) => card.id === cardId);
         return { ...list, cards: without };
       });
       if (!moving) return current;
+      const movedCard: Card = moving;
       const next = lists.map((list) => {
         if (list.id !== toListId) return list;
         const cards = [...list.cards];
         cards.splice(Math.max(0, Math.min(index, cards.length)), 0, {
-          ...(moving as Card),
+          ...movedCard,
           listId: toListId,
         });
         return { ...list, cards };
       });
       return {
         ...current,
-        lists: next.map((list) => ({
-          ...list,
-          cardCount: list.cards.length,
-        })),
+        lists: next.map((list) => ({ ...list, cardCount: list.cards.length })),
       };
     });
   };
@@ -273,7 +279,7 @@ export function BoardPage() {
   if (boardQuery.isLoading) return <CenterState>Loading board…</CenterState>;
   if (boardQuery.isError) {
     return (
-      <div className="page">
+      <div className="mx-auto max-w-lg px-5 py-10">
         <ErrorBox
           message={
             (boardQuery.error as ApiError)?.message ??
@@ -281,9 +287,9 @@ export function BoardPage() {
           }
           requestId={(boardQuery.error as ApiError)?.requestId}
         />
-        <button type="button" className="btn" onClick={() => navigate("/")}>
-          ← Back to boards
-        </button>
+        <Button className="mt-4" icon={ArrowLeft} onClick={() => navigate("/")}>
+          Back to boards
+        </Button>
       </div>
     );
   }
@@ -291,310 +297,290 @@ export function BoardPage() {
 
   return (
     <>
-      <div
-        className="topbar"
-        style={{ borderBottom: "1px solid var(--border)" }}
-      >
-        <button
-          type="button"
-          className="btn btn--ghost btn--icon"
-          onClick={() => navigate("/")}
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <strong>{view.board.name}</strong>
-        {view.board.visibility === "private" ? (
-          <Badge tone="warning">private</Badge>
-        ) : null}
-        <span className="faint" style={{ fontSize: 12.5 }}>
-          {view.board.stats.cardCount} cards · {view.lists.length} lists
-        </span>
-        <div className="topbar__spacer" />
-        {!readOnly ? (
-          <button
-            type="button"
-            className="btn btn--sm"
-            onClick={() => setBoardMenuOpen(true)}
+      <div className="flex h-[calc(100vh-56px)] flex-col">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5 border-b border-line bg-surface px-4 py-2.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => navigate("/")}
+            aria-label="Back"
           >
-            Board settings
-          </button>
-        ) : null}
-      </div>
-
-      <div
-        className="page page--flush"
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={handleDrop}
-      >
-        <div className="kanban">
-          {view.lists.map((list) => (
-            <section
-              key={list.id}
-              className="kanban__list"
-              onDragOver={(event) => {
-                if (!dragListId) return;
-                event.preventDefault();
-              }}
-              onDrop={(event) => handleListDrop(event, list.id)}
-            >
-              <header
-                className="kanban__list-head"
-                draggable={!readOnly}
-                onDragStart={() => setDragListId(list.id)}
-                onDragEnd={() => setDragListId(null)}
-                style={{ cursor: readOnly ? "default" : "grab" }}
-              >
-                <span className="faint">⠿</span>
-                <button
-                  type="button"
-                  className="kanban__list-title"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "inherit",
-                    font: "inherit",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => setRenamingListId(list.id)}
-                  title="Rename list"
-                >
-                  {list.name}
-                </button>
-                <span className="kanban__count">{list.cards.length}</span>
-                {list.wipLimit && list.cards.length > list.wipLimit ? (
-                  <Badge tone="danger">WIP</Badge>
-                ) : null}
-                {!readOnly ? (
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--icon"
-                    onClick={() => setDeletingListId(list.id)}
-                    aria-label={`Delete ${list.name}`}
-                  >
-                    ×
-                  </button>
-                ) : null}
-              </header>
-
-              <div
-                className={`kanban__cards${dropTarget?.listId === list.id ? " kanban__cards--over" : ""}`}
-                onDragOver={(event) => {
-                  if (!dragCard) return;
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                  setDropTarget({
-                    listId: list.id,
-                    index: list.cards.filter((c) => c.id !== dragCard.cardId)
-                      .length,
-                  });
-                }}
-              >
-                {list.cards
-                  .filter(
-                    (card) =>
-                      card.id !== dragCard?.cardId ||
-                      dropTarget?.listId !== list.id,
-                  )
-                  .map((card) => {
-                    const siblings = list.cards.filter(
-                      (item) => item.id !== dragCard?.cardId,
-                    );
-                    const visualIndex = siblings.findIndex(
-                      (item) => item.id === card.id,
-                    );
-                    return (
-                      <div key={card.id}>
-                        {dropTarget?.listId === list.id &&
-                        dropTarget.index === visualIndex ? (
-                          <div className="drop-indicator" />
-                        ) : null}
-                        <article
-                          className={`card${dragCard?.cardId === card.id ? " card--dragging" : ""}${card.completedAt ? " card--completed" : ""}`}
-                          draggable={!readOnly}
-                          onDragStart={(event) => {
-                            event.dataTransfer.effectAllowed = "move";
-                            event.dataTransfer.setData("text/plain", card.id);
-                            setDragCard({
-                              cardId: card.id,
-                              fromListId: list.id,
-                            });
-                          }}
-                          onDragEnd={() => {
-                            setDragCard(null);
-                            setDropTarget(null);
-                          }}
-                          onDragOver={(event) => {
-                            if (!dragCard || dragCard.cardId === card.id)
-                              return;
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const rect =
-                              event.currentTarget.getBoundingClientRect();
-                            const after =
-                              event.clientY - rect.top > rect.height / 2;
-                            setDropTarget({
-                              listId: list.id,
-                              index: visualIndex + (after ? 1 : 0),
-                            });
-                          }}
-                          onClick={() => setOpenCardId(card.id)}
-                        >
-                          {card.labels.length > 0 ? (
-                            <div className="card__labels">
-                              {card.labels.slice(0, 3).map((label) => (
-                                <span
-                                  key={label.id}
-                                  className="label-chip"
-                                  style={{ background: label.color }}
-                                >
-                                  {label.name}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                          <div className="card__title">{card.title}</div>
-                          <div className="card__meta">
-                            {card.priority !== "none" ? (
-                              <Badge
-                                tone={
-                                  card.priority === "urgent"
-                                    ? "danger"
-                                    : card.priority === "high"
-                                      ? "warning"
-                                      : "default"
-                                }
-                              >
-                                {card.priority}
-                              </Badge>
-                            ) : null}
-                            {card.dueAt ? (
-                              <span title="Due date">
-                                ⏰{" "}
-                                {new Date(card.dueAt).toLocaleDateString(
-                                  undefined,
-                                  { month: "short", day: "numeric" },
-                                )}
-                              </span>
-                            ) : null}
-                            {card.checklistProgress.total > 0 ? (
-                              <span title="Checklist progress">
-                                ☑ {card.checklistProgress.done}/
-                                {card.checklistProgress.total}
-                              </span>
-                            ) : null}
-                            {card.commentCount > 0 ? (
-                              <span title="Comments">
-                                💬 {card.commentCount}
-                              </span>
-                            ) : null}
-                            <span className="card__spacer" />
-                            {card.assigneeProfiles &&
-                            card.assigneeProfiles.length > 0 ? (
-                              <span className="avatar-stack">
-                                {card.assigneeProfiles
-                                  .slice(0, 3)
-                                  .map((person) => (
-                                    <span
-                                      key={person.id}
-                                      className="avatar"
-                                      title={person.name}
-                                      style={{
-                                        width: 20,
-                                        height: 20,
-                                        fontSize: 9,
-                                      }}
-                                    >
-                                      {person.name[0]?.toUpperCase()}
-                                    </span>
-                                  ))}
-                              </span>
-                            ) : null}
-                          </div>
-                        </article>
-                      </div>
-                    );
-                  })}
-                {dropTarget?.listId === list.id &&
-                dropTarget.index >=
-                  list.cards.filter((c) => c.id !== dragCard?.cardId).length ? (
-                  <div className="drop-indicator" />
-                ) : null}
-                {list.cards.length === 0 ? (
-                  <div
-                    className="faint"
-                    style={{
-                      fontSize: 12.5,
-                      textAlign: "center",
-                      padding: "12px 0",
-                    }}
-                  >
-                    Drop cards here
-                  </div>
-                ) : null}
-              </div>
-
-              {!readOnly ? (
-                <AddCardForm listId={list.id} boardId={boardId} />
-              ) : null}
-            </section>
-          ))}
-
+            <ArrowLeft size={15} />
+          </Button>
+          <strong className="text-[14px] text-ink">{view.board.name}</strong>
+          {view.board.visibility === "private" ? (
+            <Badge tone="warning">private</Badge>
+          ) : null}
+          <span className="text-[12px] text-faint">
+            {view.board.stats.cardCount} cards · {view.lists.length} lists
+          </span>
+          <span className="flex-1" />
           {!readOnly ? (
-            <section className="kanban__list" style={{ width: 260 }}>
-              {addingList ? (
-                <form
-                  className="kanban__list-head"
-                  onSubmit={(event: FormEvent) => {
-                    event.preventDefault();
-                    if (newListName.trim()) addListMutation.mutate();
-                  }}
+            <Button
+              size="sm"
+              icon={Settings}
+              onClick={() => setBoardMenuOpen(true)}
+            >
+              Board settings
+            </Button>
+          ) : null}
+        </div>
+
+        <div
+          className="min-h-0 flex-1 overflow-auto bg-app p-4"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={handleDrop}
+        >
+          <div className="flex h-full items-start gap-3.5">
+            {view.lists.map((list) => (
+              <section
+                key={list.id}
+                className="flex max-h-full w-[272px] shrink-0 flex-col rounded-xl border border-line bg-surface/80 shadow-sm"
+                onDragOver={(event) => {
+                  if (!dragListId) return;
+                  event.preventDefault();
+                }}
+                onDrop={(event) => handleListDrop(event, list.id)}
+              >
+                <header
+                  draggable={!readOnly}
+                  onDragStart={() => setDragListId(list.id)}
+                  onDragEnd={() => setDragListId(null)}
+                  className={`flex shrink-0 items-center gap-2 px-3 py-2.5 ${readOnly ? "" : "cursor-grab"}`}
                 >
-                  <input
-                    className="input"
-                    value={newListName}
-                    onChange={(event) => setNewListName(event.target.value)}
-                    placeholder="List name"
-                    autoFocus
-                    maxLength={120}
+                  <GripVertical
+                    size={13}
+                    className="shrink-0 text-faint"
+                    aria-hidden
                   />
                   <button
-                    type="submit"
-                    className="btn btn--primary btn--sm"
-                    disabled={addListMutation.isPending}
+                    type="button"
+                    onClick={() => setRenamingListId(list.id)}
+                    title="Rename list"
+                    className="min-w-0 flex-1 cursor-pointer truncate text-left text-[12.5px] font-bold text-ink hover:text-brand"
                   >
-                    {addListMutation.isPending ? <Spinner /> : "Add"}
+                    {list.name}
                   </button>
+                  <span className="rounded-full bg-sunken px-2 py-0.5 text-[10.5px] font-bold text-muted">
+                    {list.cards.length}
+                  </span>
+                  {list.wipLimit && list.cards.length > list.wipLimit ? (
+                    <Badge tone="danger">WIP</Badge>
+                  ) : null}
+                  {!readOnly ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Delete ${list.name}`}
+                      onClick={() => setDeletingListId(list.id)}
+                    >
+                      <X size={13} />
+                    </Button>
+                  ) : null}
+                </header>
+
+                <div
+                  className={`min-h-0 flex-1 space-y-2 overflow-y-auto px-2.5 pb-2 ${
+                    dropTarget?.listId === list.id ? "bg-brand-soft/40" : ""
+                  }`}
+                  onDragOver={(event) => {
+                    if (!dragCard) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDropTarget({
+                      listId: list.id,
+                      index: list.cards.filter((c) => c.id !== dragCard.cardId)
+                        .length,
+                    });
+                  }}
+                >
+                  {list.cards
+                    .filter(
+                      (card) =>
+                        card.id !== dragCard?.cardId ||
+                        dropTarget?.listId !== list.id,
+                    )
+                    .map((card) => {
+                      const siblings = list.cards.filter(
+                        (item) => item.id !== dragCard?.cardId,
+                      );
+                      const visualIndex = siblings.findIndex(
+                        (item) => item.id === card.id,
+                      );
+                      return (
+                        <div key={card.id}>
+                          {dropTarget?.listId === list.id &&
+                          dropTarget.index === visualIndex ? (
+                            <div className="mb-2 h-0.5 rounded bg-brand" />
+                          ) : null}
+                          <article
+                            draggable={!readOnly}
+                            onDragStart={(event) => {
+                              event.dataTransfer.effectAllowed = "move";
+                              event.dataTransfer.setData("text/plain", card.id);
+                              setDragCard({
+                                cardId: card.id,
+                                fromListId: list.id,
+                              });
+                            }}
+                            onDragEnd={() => {
+                              setDragCard(null);
+                              setDropTarget(null);
+                            }}
+                            onDragOver={(event) => {
+                              if (!dragCard || dragCard.cardId === card.id)
+                                return;
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const rect =
+                                event.currentTarget.getBoundingClientRect();
+                              const after =
+                                event.clientY - rect.top > rect.height / 2;
+                              setDropTarget({
+                                listId: list.id,
+                                index: visualIndex + (after ? 1 : 0),
+                              });
+                            }}
+                            onClick={() => setOpenCardId(card.id)}
+                            className={`cursor-pointer rounded-lg border border-line bg-surface p-3 shadow-sm transition-all hover:-translate-y-px hover:border-brand/50 hover:shadow-md ${
+                              dragCard?.cardId === card.id ? "opacity-40" : ""
+                            } ${card.completedAt ? "opacity-70" : ""}`}
+                          >
+                            {card.labels.length > 0 ? (
+                              <div className="mb-2 flex flex-wrap gap-1">
+                                {card.labels.slice(0, 3).map((label) => (
+                                  <span
+                                    key={label.id}
+                                    className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                                    style={{ background: label.color }}
+                                  >
+                                    {label.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                            <div
+                              className={`text-[12.5px] font-semibold leading-snug text-ink ${
+                                card.completedAt ? "line-through" : ""
+                              }`}
+                            >
+                              {card.title}
+                            </div>
+                            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                              {card.priority !== "none" ? (
+                                <Badge tone={PRIORITY_TONE[card.priority]}>
+                                  {card.priority}
+                                </Badge>
+                              ) : null}
+                              {card.dueAt ? (
+                                <span className="flex items-center gap-1 text-[10.5px] font-semibold text-faint">
+                                  <CalendarDays size={11} aria-hidden />
+                                  {new Date(card.dueAt).toLocaleDateString()}
+                                </span>
+                              ) : null}
+                              {card.checklistProgress.total > 0 ? (
+                                <span className="flex items-center gap-1 text-[10.5px] font-semibold text-faint">
+                                  <CheckSquare size={11} aria-hidden />
+                                  {card.checklistProgress.done}/
+                                  {card.checklistProgress.total}
+                                </span>
+                              ) : null}
+                              {card.commentCount > 0 ? (
+                                <span className="flex items-center gap-1 text-[10.5px] font-semibold text-faint">
+                                  <MessageSquare size={11} aria-hidden />
+                                  {card.commentCount}
+                                </span>
+                              ) : null}
+                              {card.attachmentCount > 0 ? (
+                                <span className="flex items-center gap-1 text-[10.5px] font-semibold text-faint">
+                                  <Paperclip size={11} aria-hidden />
+                                  {card.attachmentCount}
+                                </span>
+                              ) : null}
+                              <span className="flex-1" />
+                              {card.assigneeProfiles
+                                ?.slice(0, 3)
+                                .map((person) => (
+                                  <Avatar
+                                    key={person.id}
+                                    name={person.name}
+                                    size="sm"
+                                  />
+                                ))}
+                            </div>
+                          </article>
+                        </div>
+                      );
+                    })}
+                  {dropTarget?.listId === list.id &&
+                  dropTarget.index >=
+                    list.cards.filter((c) => c.id !== dragCard?.cardId)
+                      .length ? (
+                    <div className="h-0.5 rounded bg-brand" />
+                  ) : null}
+                </div>
+
+                {!readOnly ? (
+                  <AddCardForm listId={list.id} boardId={boardId} />
+                ) : null}
+              </section>
+            ))}
+
+            {!readOnly ? (
+              <section className="w-[272px] shrink-0">
+                {addingList ? (
+                  <form
+                    className="flex items-center gap-2 rounded-xl border border-line bg-surface p-2.5 shadow-sm"
+                    onSubmit={(event: FormEvent) => {
+                      event.preventDefault();
+                      if (newListName.trim()) addListMutation.mutate();
+                    }}
+                  >
+                    <Input
+                      value={newListName}
+                      onChange={(event) => setNewListName(event.target.value)}
+                      placeholder="List name"
+                      autoFocus
+                      maxLength={120}
+                    />
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      loading={addListMutation.isPending}
+                    >
+                      Add
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setAddingList(false)}
+                    >
+                      <X size={13} />
+                    </Button>
+                  </form>
+                ) : (
                   <button
                     type="button"
-                    className="btn btn--ghost btn--icon"
-                    onClick={() => setAddingList(false)}
+                    onClick={() => setAddingList(true)}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong/60 py-2.5 text-[12.5px] font-bold text-muted transition-colors hover:border-brand/60 hover:text-brand"
                   >
-                    ×
+                    <Plus size={14} aria-hidden /> Add list
                   </button>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--block"
-                  onClick={() => setAddingList(true)}
-                >
-                  + Add list
-                </button>
-              )}
-            </section>
-          ) : null}
+                )}
+              </section>
+            ) : null}
 
-          {view.lists.length === 0 ? (
-            <div className="panel" style={{ margin: "auto" }}>
-              <EmptyState
-                icon="▦"
-                title="This board has no lists"
-                hint="Add a list to start adding cards."
-              />
-            </div>
-          ) : null}
+            {view.lists.length === 0 ? (
+              <div className="m-auto rounded-xl border border-line bg-surface">
+                <EmptyState
+                  icon={GripVertical}
+                  title="This board has no lists"
+                  hint="Add a list to start adding cards."
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -603,20 +589,12 @@ export function BoardPage() {
           name="Card Details"
           onReset={() => setOpenCardId(null)}
           fallback={
-            <Modal
-              title="Error"
-              onClose={() => setOpenCardId(null)}
-              wide={false}
-            >
+            <Modal title="Error" onClose={() => setOpenCardId(null)} size="sm">
               <ErrorBox message="Could not render card details. An unexpected error occurred." />
-              <div style={{ marginTop: 12, textAlign: "right" }}>
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={() => setOpenCardId(null)}
-                >
+              <div className="mt-3 text-right">
+                <Button variant="primary" onClick={() => setOpenCardId(null)}>
                   Close
-                </button>
+                </Button>
               </div>
             </Modal>
           }
@@ -686,13 +664,13 @@ function AddCardForm({ listId, boardId }: { listId: string; boardId: string }) {
 
   if (!open) {
     return (
-      <div className="kanban__list-foot">
+      <div className="shrink-0 p-2.5 pt-1">
         <button
           type="button"
-          className="btn btn--ghost btn--sm btn--block"
           onClick={() => setOpen(true)}
+          className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-bold text-faint transition-colors hover:bg-sunken hover:text-ink"
         >
-          + Add card
+          <Plus size={13} aria-hidden /> Add card
         </button>
       </div>
     );
@@ -700,36 +678,33 @@ function AddCardForm({ listId, boardId }: { listId: string; boardId: string }) {
 
   return (
     <form
-      className="kanban__list-foot"
+      className="shrink-0 space-y-2 p-2.5 pt-1"
       onSubmit={(event) => {
         event.preventDefault();
         if (title.trim()) mutation.mutate();
       }}
     >
-      <textarea
-        className="textarea"
-        style={{ minHeight: 54 }}
+      <Textarea
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder="Card title"
         autoFocus
         maxLength={200}
+        className="min-h-[54px]"
       />
-      <div className="row" style={{ marginTop: 8 }}>
-        <button
+      <div className="flex items-center gap-2">
+        <Button
           type="submit"
-          className="btn btn--primary btn--sm"
-          disabled={mutation.isPending || !title.trim()}
+          variant="primary"
+          size="sm"
+          loading={mutation.isPending}
+          disabled={!title.trim()}
         >
-          {mutation.isPending ? <Spinner /> : "Add card"}
-        </button>
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() => setOpen(false)}
-        >
+          Add card
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -763,27 +738,25 @@ function RenameListDialog({
     <Modal
       title="Rename list"
       onClose={onClose}
-      wide={false}
+      size="sm"
       footer={
         <>
-          <button type="button" className="btn" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={mutation.isPending || !name.trim()}
+          </Button>
+          <Button
+            variant="primary"
+            loading={mutation.isPending}
+            disabled={!name.trim()}
             onClick={() => mutation.mutate()}
           >
-            {mutation.isPending ? <Spinner /> : null}
             Save
-          </button>
+          </Button>
         </>
       }
     >
       <Field label="List name">
-        <input
-          className="input"
+        <Input
           value={name}
           onChange={(event) => setName(event.target.value)}
           maxLength={120}
@@ -835,35 +808,33 @@ function BoardSettingsDialog({
       <Modal
         title="Board settings"
         onClose={onClose}
-        wide={false}
+        size="sm"
         footer={
           <>
-            <button
-              type="button"
-              className="btn btn--danger"
+            <Button
+              variant="danger"
+              icon={Trash2}
               onClick={() => setConfirmOpen(true)}
             >
               Delete board
-            </button>
-            <span className="grow" />
-            <button type="button" className="btn" onClick={onClose}>
+            </Button>
+            <span className="flex-1" />
+            <Button variant="ghost" onClick={onClose}>
               Close
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={rename.isPending || !boardName.trim()}
+            </Button>
+            <Button
+              variant="primary"
+              loading={rename.isPending}
+              disabled={!boardName.trim()}
               onClick={() => rename.mutate()}
             >
-              {rename.isPending ? <Spinner /> : null}
               Save
-            </button>
+            </Button>
           </>
         }
       >
         <Field label="Board name">
-          <input
-            className="input"
+          <Input
             value={boardName}
             onChange={(event) => setBoardName(event.target.value)}
             maxLength={120}

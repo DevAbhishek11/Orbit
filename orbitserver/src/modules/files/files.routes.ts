@@ -29,6 +29,8 @@ filesRouter.post(
   controller.confirm,
 );
 
+filesRouter.get('/files', authorize('board:read', {}), controller.listFiles);
+
 filesRouter.get(
   '/files/:id/download',
   validate({ params: fileParamsSchema }),

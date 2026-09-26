@@ -141,38 +141,51 @@ export async function getBoardDetails(
   });
 }
 
-interface BoardCardRaw extends Record<string, unknown> {
+interface BoardCardRaw {
+  _id: unknown;
+  listId?: string;
   assignees?: string[];
+  [key: string]: unknown;
 }
-type BoardListView = ListDoc & { cards: BoardCardRaw[] };
 
 async function buildBoardView(board: BoardDoc): Promise<Record<string, unknown>> {
-  const rows = await ListModel.aggregate<BoardListView>([
-    { $match: { boardId: String(board._id), archivedAt: null, deletedAt: null } },
-    { $sort: { order: 1 } },
-    {
-      $lookup: {
-        from: 'cards',
-        let: { lid: { $toString: '$_id' } },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ['$listId', '$$lid'] },
-              archivedAt: null,
-              deletedAt: null,
-            },
-          },
-          { $sort: { order: 1 } },
-          { $limit: 100 },
-        ],
-        as: 'cards',
-      },
-    },
-  ]).exec();
+  // Two portable queries instead of a $lookup pipeline: list ids are ObjectIds
+  // while cards store `listId` as a string, and the ObjectId→string coercion
+  // inside aggregation pipelines is not available on every engine.
+  const lists = await ListModel.find({
+    boardId: String(board._id),
+    archivedAt: null,
+    deletedAt: null,
+  })
+    .sort({ order: 1 })
+    .exec();
+
+  const listIds = lists.map((list) => String(list._id));
+  const cardsByList = new Map<string, BoardCardRaw[]>();
+  if (listIds.length > 0) {
+    const cards = (await CardModel.find({
+      listId: { $in: listIds },
+      archivedAt: null,
+      deletedAt: null,
+    })
+      .sort({ order: 1 })
+      .limit(2000)
+      .exec()) as unknown as BoardCardRaw[];
+    for (const card of cards) {
+      const bucket = cardsByList.get(card.listId ?? '');
+      if (!bucket) cardsByList.set(card.listId ?? '', [card]);
+      else if (bucket.length < 100) bucket.push(card);
+    }
+  }
+
+  const rows: { list: ListDoc; cards: BoardCardRaw[] }[] = lists.map((list) => ({
+    list,
+    cards: cardsByList.get(String(list._id)) ?? [],
+  }));
 
   const assigneeIds = new Set<string>();
-  for (const list of rows) {
-    for (const card of list.cards) {
+  for (const row of rows) {
+    for (const card of row.cards) {
       for (const a of card.assignees ?? []) assigneeIds.add(a);
     }
   }
@@ -186,14 +199,14 @@ async function buildBoardView(board: BoardDoc): Promise<Record<string, unknown>>
 
   return {
     board: serializeBoard(board),
-    lists: rows.map((list) => ({
+    lists: rows.map(({ list, cards }) => ({
       id: String(list._id),
       name: list.name,
       order: list.order,
       color: list.color ?? null,
       wipLimit: list.wipLimit ?? null,
       cardCount: list.cardCount,
-      cards: list.cards.map((card) => ({
+      cards: cards.map((card) => ({
         ...card,
         id: String(card._id),
         assigneeProfiles: (card.assignees ?? [])

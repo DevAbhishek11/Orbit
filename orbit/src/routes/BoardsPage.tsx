@@ -1,39 +1,48 @@
-import { useState, useMemo, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  LayoutDashboard,
-  Kanban,
-  Users,
-  Star,
-  Search,
-  Plus,
-  LayoutGrid,
-  List,
   ArrowUpRight,
-  Sparkles,
-  FileText,
-  X,
-  TrendingUp,
-  Layers,
-  Clock,
+  Calendar,
   CheckCircle2,
+  Clock,
   AlertCircle,
   Download,
-  Calendar,
+  FileText,
+  Kanban,
+  Layers,
+  LayoutDashboard,
+  LayoutGrid,
+  List,
+  Plus,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 import { ApiError } from "../api/client";
-import { boardsApi, workspacesApi } from "../api/endpoints";
+import { boardsApi } from "../api/endpoints";
 import type { Board } from "../api/types";
-import { useAuth } from "../state/auth";
-import { useToast } from "../state/toast";
+import { CreateWorkspaceModal } from "../components/CreateWorkspaceModal";
 import {
+  Avatar,
   Badge,
+  Button,
+  Card,
+  CardHeader,
   CenterState,
   EmptyState,
   Field,
-  Spinner,
+  Input,
+  Modal,
+  ProgressBar,
+  SearchInput,
+  Segmented,
+  Select,
+  Textarea,
 } from "../components/ui";
+import { useAuth } from "../state/auth";
+import { useToast } from "../state/toast";
 
 const PERIOD_OPTIONS = [
   "All Time",
@@ -43,61 +52,8 @@ const PERIOD_OPTIONS = [
   "Today",
 ];
 
-interface RecentTaskRow {
-  id: string;
-  board: string;
-  assignee: string;
-  date: string;
-  status: "Completed" | "Active" | "Pending";
-}
-
-const sampleRecentTasks: RecentTaskRow[] = [
-  {
-    id: "TSK-1042",
-    board: "Core Engine",
-    assignee: "Abhishek P.",
-    date: "Today, 14:20",
-    status: "Active",
-  },
-  {
-    id: "TSK-1041",
-    board: "UI Platform",
-    assignee: "Sarah Connor",
-    date: "Today, 11:05",
-    status: "Completed",
-  },
-  {
-    id: "TSK-1040",
-    board: "Infra Cluster",
-    assignee: "Alex Rivera",
-    date: "Yesterday",
-    status: "Completed",
-  },
-  {
-    id: "TSK-1039",
-    board: "API Gateway",
-    assignee: "Dev Team",
-    date: "Sep 24, 2026",
-    status: "Pending",
-  },
-  {
-    id: "TSK-1038",
-    board: "Security Audit",
-    assignee: "Abhishek P.",
-    date: "Sep 23, 2026",
-    status: "Completed",
-  },
-];
-
 export function BoardsPage() {
-  const {
-    workspaceId,
-    workspace,
-    user,
-    role,
-    refreshWorkspaces,
-    selectWorkspace,
-  } = useAuth();
+  const { workspaceId, workspace, user, role } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
@@ -126,7 +82,6 @@ export function BoardsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
-  const [wsName, setWsName] = useState("");
 
   const boardsQuery = useQuery({
     queryKey: ["boards", workspaceId],
@@ -139,11 +94,11 @@ export function BoardsPage() {
     [boardsQuery.data?.boards],
   );
 
-  const toggleFavorite = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleFavorite = (id: string, event: React.MouseEvent) => {
+    event.stopPropagation();
     setFavorites((prev) => {
       const next = prev.includes(id)
-        ? prev.filter((x) => x !== id)
+        ? prev.filter((existing) => existing !== id)
         : [...prev, id];
       localStorage.setItem("orbit.favorites", JSON.stringify(next));
       return next;
@@ -156,13 +111,13 @@ export function BoardsPage() {
         name: data.name,
         description: data.description,
       }),
-    onSuccess: (newBoard) => {
-      toast.success("Board created successfully");
+    onSuccess: (created) => {
+      toast.success("Board created", `“${created.name}” is ready for cards.`);
       setCreateOpen(false);
       setName("");
       setDescription("");
       void queryClient.invalidateQueries({ queryKey: ["boards", workspaceId] });
-      navigate(`/boards/${newBoard.id}`);
+      navigate(`/boards/${created.id}`);
     },
     onError: (err) => {
       toast.error(
@@ -171,39 +126,16 @@ export function BoardsPage() {
     },
   });
 
-  const createWorkspaceMutation = useMutation({
-    mutationFn: (wName: string) => {
-      const slug =
-        wName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)/g, "") || "workspace";
-      return workspacesApi.create({ name: wName, slug });
-    },
-    onSuccess: async (createdWs) => {
-      toast.success("Workspace created successfully");
-      setCreateWorkspaceOpen(false);
-      setWsName("");
-      await refreshWorkspaces();
-      await selectWorkspace(createdWs.id);
-    },
-    onError: (err) => {
-      toast.error(
-        err instanceof ApiError ? err.message : "Could not create workspace",
-      );
-    },
-  });
-
   const filteredBoards = useMemo(() => {
     return boards
       .filter(
-        (board: Board) =>
+        (board) =>
           (!onlyFavorites || favorites.includes(board.id)) &&
           `${board.name} ${board.description ?? ""}`
             .toLowerCase()
             .includes(search.toLowerCase()),
       )
-      .sort((a: Board, b: Board) => {
+      .sort((a, b) => {
         if (sort === "name") return a.name.localeCompare(b.name);
         if (sort === "cards")
           return (b.stats?.cardCount ?? 0) - (a.stats?.cardCount ?? 0);
@@ -213,17 +145,13 @@ export function BoardsPage() {
       });
   }, [boards, onlyFavorites, favorites, search, sort]);
 
-  const totalCards = useMemo(() => {
-    return boards.reduce(
-      (acc: number, b: Board) => acc + (b.stats?.cardCount ?? 0),
-      0,
-    );
-  }, [boards]);
+  const totalCards = useMemo(
+    () => boards.reduce((acc, board) => acc + (board.stats?.cardCount ?? 0), 0),
+    [boards],
+  );
 
-  const activeSprints = boards.length > 0 ? Math.ceil(boards.length / 2) : 1;
-
-  const handleCreateSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  const handleCreateSubmit = (event: FormEvent) => {
+    event.preventDefault();
     if (!name.trim()) return;
     createMutation.mutate({
       name: name.trim(),
@@ -231,324 +159,285 @@ export function BoardsPage() {
     });
   };
 
-  const handleCreateWorkspace = (e: FormEvent) => {
-    e.preventDefault();
-    if (!wsName.trim()) return;
-    createWorkspaceMutation.mutate(wsName.trim());
-  };
-
   return (
-    <div className="portal-dashboard">
-      <div className="portal-hero">
-        <div className="portal-hero__meta">
-          <div className="portal-hero__badge">
-            <Sparkles size={14} style={{ marginRight: 6 }} /> Executive Overview
+    <div className="mx-auto w-full max-w-[1400px] px-5 py-6">
+      {/* Hero */}
+      <section className="relative mb-6 overflow-hidden rounded-2xl border border-line bg-sidebar px-6 py-6 text-sidebar-strong">
+        <div
+          className="pointer-events-none absolute -right-24 -top-32 h-72 w-72 rounded-full bg-brand/25 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-40 left-1/3 h-72 w-72 rounded-full bg-info/20 blur-3xl"
+          aria-hidden
+        />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-brand/20 px-2.5 py-1 text-[11px] font-bold text-brand">
+              <Sparkles size={12} aria-hidden /> Executive Overview
+            </span>
+            <h1 className="text-[22px] font-extrabold tracking-tight">
+              Welcome back, {user?.name || "Administrator"}
+            </h1>
+            <p className="mt-1 max-w-xl text-[12.5px] text-sidebar-ink">
+              Monitor enterprise performance, active sprint boards, and project
+              metrics in {workspace?.name ?? "your workspace"}.
+            </p>
           </div>
-          <h1 className="portal-hero__title">
-            Welcome back, {user?.name || "Administrator"}
-          </h1>
-          <p className="portal-hero__desc">
-            Monitor enterprise performance, active sprint boards, and project
-            metrics in {workspace?.name ?? "Workspace"}.
-          </p>
-        </div>
-        <div className="portal-hero__actions">
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() => setCreateWorkspaceOpen(true)}
-          >
-            <Plus size={15} style={{ marginRight: 6 }} /> New Workspace
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={!canCreate}
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus size={15} style={{ marginRight: 6 }} /> New Board
-          </button>
-        </div>
-      </div>
-
-      <div className="period-bar">
-        <span className="period-bar__label">
-          <Calendar size={13} style={{ marginRight: 6 }} /> Period:
-        </span>
-        <div className="period-bar__pills">
-          {PERIOD_OPTIONS.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              className={`period-pill ${period === opt ? "is-active" : ""}`}
-              onClick={() => setPeriod(opt)}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="border-white/20 bg-white/10 text-sidebar-strong hover:bg-white/20 hover:text-white"
+              onClick={() => setCreateWorkspaceOpen(true)}
+              icon={Plus}
             >
-              {opt}
+              New Workspace
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!canCreate}
+              onClick={() => setCreateOpen(true)}
+              icon={Plus}
+            >
+              New Board
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Period filter */}
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-muted">
+          <Calendar size={13} aria-hidden /> Period:
+        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {PERIOD_OPTIONS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setPeriod(option)}
+              className={`h-7 cursor-pointer rounded-full px-3 text-[11.5px] font-bold transition-colors ${
+                period === option
+                  ? "bg-brand text-brand-ink shadow-sm"
+                  : "border border-line bg-surface text-muted hover:text-ink"
+              }`}
+            >
+              {option}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="kpi-row kpi-row--primary">
-        <div className="kpi-card">
-          <div className="kpi-card__body">
-            <span className="kpi-card__label">Total Projects</span>
-            <div className="kpi-card__value">
-              {boardsQuery.isSuccess ? boards.length : "—"}
-            </div>
-            <span className="kpi-card__subtext">{period}</span>
-          </div>
-          <span className="kpi-card__icon kpi-card__icon--orange">
-            <LayoutDashboard size={20} />
-          </span>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-card__body">
-            <span className="kpi-card__label">Active Work Items</span>
-            <div className="kpi-card__value">
-              {boardsQuery.isSuccess ? totalCards : "—"}
-            </div>
-            <span className="kpi-card__subtext">
-              Across {boards.length} sprint boards
-            </span>
-          </div>
-          <span className="kpi-card__icon kpi-card__icon--teal">
-            <Kanban size={20} />
-          </span>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-card__body">
-            <span className="kpi-card__label">Active Sprints</span>
-            <div className="kpi-card__value">
-              {boardsQuery.isSuccess ? activeSprints : "—"}
-            </div>
-            <span className="kpi-card__subtext">Current velocity: 94.2%</span>
-          </div>
-          <span className="kpi-card__icon kpi-card__icon--blue">
-            <TrendingUp size={20} />
-          </span>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-card__body">
-            <span className="kpi-card__label">Team Capacity</span>
-            <div className="kpi-card__value">100%</div>
-            <span className="kpi-card__subtext">Real-time sync active</span>
-          </div>
-          <span className="kpi-card__icon kpi-card__icon--green">
-            <Users size={20} />
-          </span>
-        </div>
+      {/* Primary KPIs */}
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label="Total Projects"
+          value={boardsQuery.isSuccess ? String(boards.length) : "—"}
+          subtext={period}
+          icon={LayoutDashboard}
+          tone="brand"
+        />
+        <KpiCard
+          label="Active Work Items"
+          value={boardsQuery.isSuccess ? String(totalCards) : "—"}
+          subtext={`Across ${boards.length} sprint boards`}
+          icon={Kanban}
+          tone="info"
+        />
+        <KpiCard
+          label="Active Sprints"
+          value={
+            boardsQuery.isSuccess
+              ? String(Math.max(1, Math.ceil(boards.length / 2)))
+              : "—"
+          }
+          subtext="Current velocity: 94.2%"
+          icon={TrendingUp}
+          tone="violet"
+        />
+        <KpiCard
+          label="Team Capacity"
+          value="100%"
+          subtext="Real-time sync active"
+          icon={Users}
+          tone="ok"
+        />
       </div>
 
-      <div className="kpi-row kpi-row--secondary">
-        <div className="kpi-metric-card">
-          <div className="kpi-metric-card__header">
-            <span className="kpi-metric-card__label">Completed Tasks</span>
-            <CheckCircle2 size={16} className="faint" />
-          </div>
-          <div className="kpi-metric-card__value">1,280</div>
-          <span className="kpi-metric-card__delta is-positive">
-            +12.4% vs last period
-          </span>
-        </div>
-
-        <div className="kpi-metric-card">
-          <div className="kpi-metric-card__header">
-            <span className="kpi-metric-card__label">Pending Review</span>
-            <Clock size={16} className="faint" />
-          </div>
-          <div className="kpi-metric-card__value">42</div>
-          <span className="kpi-metric-card__delta is-neutral">On track</span>
-        </div>
-
-        <div className="kpi-metric-card">
-          <div className="kpi-metric-card__header">
-            <span className="kpi-metric-card__label">Overdue Items</span>
-            <AlertCircle size={16} className="faint" />
-          </div>
-          <div className="kpi-metric-card__value">3</div>
-          <span className="kpi-metric-card__delta is-negative">
-            -40% down from 5
-          </span>
-        </div>
-
-        <div className="kpi-metric-card">
-          <div className="kpi-metric-card__header">
-            <span className="kpi-metric-card__label">Documents</span>
-            <FileText size={16} className="faint" />
-          </div>
-          <div className="kpi-metric-card__value">64</div>
-          <span className="kpi-metric-card__delta is-positive">
-            Active knowledge base
-          </span>
-        </div>
-
-        <div className="kpi-metric-card">
-          <div className="kpi-metric-card__header">
-            <span className="kpi-metric-card__label">Data Throughput</span>
-            <Layers size={16} className="faint" />
-          </div>
-          <div className="kpi-metric-card__value">99.98%</div>
-          <span className="kpi-metric-card__delta is-positive">
-            Zero downtime
-          </span>
-        </div>
+      {/* Secondary KPIs */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+        <MetricCard
+          label="Completed Tasks"
+          value="1,280"
+          delta="+12.4% vs last period"
+          tone="up"
+          icon={CheckCircle2}
+        />
+        <MetricCard
+          label="Pending Review"
+          value="42"
+          delta="On track"
+          tone="flat"
+          icon={Clock}
+        />
+        <MetricCard
+          label="Overdue Items"
+          value="3"
+          delta="-40% down from 5"
+          tone="down"
+          icon={AlertCircle}
+        />
+        <MetricCard
+          label="Documents"
+          value="64"
+          delta="Active knowledge base"
+          tone="up"
+          icon={FileText}
+        />
+        <MetricCard
+          label="Data Throughput"
+          value="99.98%"
+          delta="Zero downtime"
+          tone="up"
+          icon={Layers}
+        />
       </div>
 
-      <div className="portal-grid">
-        <div className="portal-grid__main">
-          <div className="portal-card">
-            <div className="portal-card__header">
-              <div>
-                <h3 className="portal-card__title">
-                  Recent Tasks & Sprint Activity
-                </h3>
-                <span className="portal-card__subtitle">
-                  Showing latest tasks in{" "}
-                  {workspace?.name ?? "current workspace"}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => toast.info("Exporting recent activity log...")}
-              >
-                <Download size={14} style={{ marginRight: 4 }} /> Export
-              </button>
-            </div>
-
-            <div className="portal-table-container">
-              <table className="portal-table">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
+        {/* Main column */}
+        <div className="min-w-0 space-y-5">
+          <Card>
+            <CardHeader
+              title="Recent Tasks & Sprint Activity"
+              subtitle={`Showing latest tasks in ${workspace?.name ?? "current workspace"}`}
+              actions={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Download}
+                  onClick={() => toast.info("Exporting recent activity log…")}
+                >
+                  Export
+                </Button>
+              }
+            />
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] border-collapse text-left">
                 <thead>
-                  <tr>
-                    <th>CODE</th>
-                    <th>BOARD</th>
-                    <th>ASSIGNEE</th>
-                    <th>DATE</th>
-                    <th>STATUS</th>
-                    <th></th>
+                  <tr className="border-b border-line text-[10.5px] font-bold uppercase tracking-wider text-faint">
+                    <th className="pb-2 pr-3">Code</th>
+                    <th className="pb-2 pr-3">Board</th>
+                    <th className="pb-2 pr-3">Assignee</th>
+                    <th className="pb-2 pr-3">Date</th>
+                    <th className="pb-2 pr-3">Status</th>
+                    <th className="pb-2" />
                   </tr>
                 </thead>
                 <tbody>
-                  {sampleRecentTasks.map((task) => (
-                    <tr key={task.id} className="portal-table__row">
-                      <td className="portal-table__code">{task.id}</td>
-                      <td>
-                        <span className="portal-badge-pill">{task.board}</span>
+                  {RECENT_TASKS.map((task) => (
+                    <tr
+                      key={task.id}
+                      className="border-b border-line/60 last:border-0 hover:bg-sunken/50"
+                    >
+                      <td className="py-2.5 pr-3 font-mono text-[11.5px] font-bold text-brand">
+                        {task.id}
                       </td>
-                      <td className="portal-table__party">{task.assignee}</td>
-                      <td className="faint" style={{ fontSize: 12 }}>
+                      <td className="py-2.5 pr-3">
+                        <Badge>{task.board}</Badge>
+                      </td>
+                      <td className="py-2.5 pr-3 text-[12.5px] text-muted">
+                        {task.assignee}
+                      </td>
+                      <td className="py-2.5 pr-3 text-[12px] text-faint">
                         {task.date}
                       </td>
-                      <td>
+                      <td className="py-2.5 pr-3">
                         <Badge
                           tone={
                             task.status === "Completed"
                               ? "success"
                               : task.status === "Active"
-                                ? "accent"
+                                ? "info"
                                 : "warning"
                           }
                         >
                           {task.status}
                         </Badge>
                       </td>
-                      <td style={{ textAlign: "right" }}>
-                        <ArrowUpRight size={14} className="faint" />
+                      <td className="py-2.5 text-right">
+                        <ArrowUpRight
+                          size={14}
+                          className="inline text-faint"
+                          aria-hidden
+                        />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
 
-          <div className="portal-card" style={{ marginTop: 24 }}>
-            <div className="portal-card__header">
-              <div>
-                <h3 className="portal-card__title">Active Boards Directory</h3>
-                <span className="portal-card__subtitle">
-                  {boards.length} configured boards
-                </span>
-              </div>
-              <div className="portal-toolbar-actions">
-                <button
-                  type="button"
-                  className={`btn btn--sm ${onlyFavorites ? "btn--accent" : "btn--ghost"}`}
-                  onClick={() => setOnlyFavorites((prev) => !prev)}
-                  title="Filter favorites"
-                  style={{ height: 32, padding: "0 8px" }}
-                >
-                  <Star
-                    size={13}
-                    fill={onlyFavorites ? "currentColor" : "none"}
-                  />
-                </button>
-                <select
-                  className="portal-table__select"
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value)}
-                  style={{
-                    height: 32,
-                    padding: "0 8px",
-                    fontSize: 12,
-                    borderRadius: 6,
-                  }}
-                >
-                  <option value="recent">Recent</option>
-                  <option value="name">Name</option>
-                  <option value="cards">Most Cards</option>
-                </select>
-                <label className="search-box">
-                  <Search size={14} className="search-box__icon" />
-                  <input
+          <Card>
+            <CardHeader
+              title="Active Boards Directory"
+              subtitle={`${boards.length} configured boards`}
+              actions={
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setOnlyFavorites((prev) => !prev)}
+                    title="Filter favorites"
+                    className={`cursor-pointer rounded-md p-1.5 transition-colors ${
+                      onlyFavorites
+                        ? "bg-brand-soft text-brand"
+                        : "text-faint hover:bg-sunken hover:text-ink"
+                    }`}
+                  >
+                    <Star
+                      size={14}
+                      fill={onlyFavorites ? "currentColor" : "none"}
+                      aria-hidden
+                    />
+                  </button>
+                  <Select
+                    value={sort}
+                    onChange={(event) => setSort(event.target.value)}
+                    className="w-[120px]"
+                    aria-label="Sort boards"
+                  >
+                    <option value="recent">Recent</option>
+                    <option value="name">Name</option>
+                    <option value="cards">Most Cards</option>
+                  </Select>
+                  <SearchInput
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search boards..."
+                    onChange={setSearch}
+                    placeholder="Search boards…"
+                    className="w-[180px]"
                   />
-                  {search && (
-                    <button onClick={() => setSearch("")}>
-                      <X size={13} />
-                    </button>
-                  )}
-                </label>
-                <div className="view-toggle">
-                  <button
-                    className={layout === "grid" ? "active" : ""}
-                    onClick={() => setLayout("grid")}
-                    title="Grid view"
-                  >
-                    <LayoutGrid size={15} />
-                  </button>
-                  <button
-                    className={layout === "list" ? "active" : ""}
-                    onClick={() => setLayout("list")}
-                    title="List view"
-                  >
-                    <List size={15} />
-                  </button>
-                </div>
-              </div>
-            </div>
+                  <Segmented
+                    size="sm"
+                    value={layout}
+                    onChange={setLayout}
+                    options={[
+                      { value: "grid", icon: LayoutGrid, title: "Grid view" },
+                      { value: "list", icon: List, title: "List view" },
+                    ]}
+                  />
+                </>
+              }
+            />
 
-            {boardsQuery.isLoading && (
+            {boardsQuery.isLoading ? (
+              <CenterState>Loading boards…</CenterState>
+            ) : boardsQuery.isError ? (
               <CenterState>
-                <Spinner large />
+                <span className="text-danger">Failed to load boards.</span>
               </CenterState>
-            )}
-
-            {boardsQuery.isError && (
-              <CenterState>
-                <p className="danger">Failed to load boards.</p>
-              </CenterState>
-            )}
-
-            {boardsQuery.isSuccess && filteredBoards.length === 0 && (
+            ) : filteredBoards.length === 0 ? (
               <EmptyState
-                icon="▦"
+                icon={Kanban}
                 title={
                   boards.length === 0
                     ? "No boards in this workspace"
@@ -561,278 +450,380 @@ export function BoardsPage() {
                 }
                 action={
                   boards.length === 0 && canCreate ? (
-                    <button
-                      type="button"
-                      className="btn btn--primary"
+                    <Button
+                      variant="primary"
+                      icon={Plus}
                       onClick={() => setCreateOpen(true)}
                     >
-                      <Plus size={15} style={{ marginRight: 6 }} /> Create First
-                      Board
-                    </button>
+                      Create First Board
+                    </Button>
                   ) : undefined
                 }
               />
-            )}
-
-            {boardsQuery.isSuccess && filteredBoards.length > 0 && (
-              <div
-                className={layout === "grid" ? "boards-grid" : "boards-list"}
-              >
-                {filteredBoards.map((board: Board) => {
+            ) : layout === "grid" ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredBoards.map((board) => {
+                  const isFav = favorites.includes(board.id);
+                  return (
+                    <button
+                      key={board.id}
+                      type="button"
+                      onClick={() => navigate(`/boards/${board.id}`)}
+                      className="group cursor-pointer rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-md"
+                    >
+                      <div className="mb-3 flex items-start justify-between">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                          <Kanban size={16} aria-hidden />
+                        </span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(event) => toggleFavorite(board.id, event)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter")
+                              toggleFavorite(
+                                board.id,
+                                event as unknown as React.MouseEvent,
+                              );
+                          }}
+                          title={isFav ? "Remove favorite" : "Mark favorite"}
+                          className={`rounded-md p-1 transition-colors ${
+                            isFav
+                              ? "text-brand"
+                              : "text-faint opacity-0 hover:text-ink group-hover:opacity-100"
+                          }`}
+                        >
+                          <Star
+                            size={14}
+                            fill={isFav ? "currentColor" : "none"}
+                            aria-hidden
+                          />
+                        </span>
+                      </div>
+                      <div className="text-[13.5px] font-bold text-ink">
+                        {board.name}
+                      </div>
+                      {board.description ? (
+                        <p className="mt-1 line-clamp-2 text-[12px] text-faint">
+                          {board.description}
+                        </p>
+                      ) : null}
+                      <div className="mt-3 flex items-center justify-between text-[11.5px] text-faint">
+                        <span className="font-bold text-muted">
+                          {board.stats?.cardCount ?? 0} cards
+                        </span>
+                        <span>
+                          Updated{" "}
+                          {new Date(board.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="divide-y divide-line/70">
+                {filteredBoards.map((board) => {
                   const isFav = favorites.includes(board.id);
                   return (
                     <div
                       key={board.id}
-                      className="board-card"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => navigate(`/boards/${board.id}`)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter")
+                          navigate(`/boards/${board.id}`);
+                      }}
+                      className="flex cursor-pointer items-center gap-3 py-2.5 hover:bg-sunken/50"
                     >
-                      <div className="board-card__header">
-                        <div className="board-card__icon-box">
-                          <Kanban size={18} />
-                        </div>
-                        <button
-                          type="button"
-                          className={`board-card__star ${isFav ? "is-favorited" : ""}`}
-                          onClick={(e) => toggleFavorite(board.id, e)}
-                          title={isFav ? "Remove favorite" : "Mark favorite"}
-                        >
-                          <Star
-                            size={15}
-                            fill={isFav ? "currentColor" : "none"}
-                          />
-                        </button>
-                      </div>
-
-                      <div className="board-card__body">
-                        <h4 className="board-card__name">{board.name}</h4>
-                        {board.description && (
-                          <p className="board-card__desc">
-                            {board.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="board-card__footer">
-                        <div className="board-card__metric">
-                          <span className="board-card__count">
-                            {board.stats?.cardCount ?? 0}
-                          </span>{" "}
-                          cards
-                        </div>
-                        <div className="board-card__date">
-                          Updated{" "}
-                          {new Date(board.updatedAt).toLocaleDateString()}
-                        </div>
-                      </div>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
+                        <Kanban size={14} aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-bold text-ink">
+                          {board.name}
+                        </span>
+                        <span className="block truncate text-[11.5px] text-faint">
+                          {board.description || "No description"}
+                        </span>
+                      </span>
+                      <span className="text-[11.5px] font-bold text-muted">
+                        {board.stats?.cardCount ?? 0} cards
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => toggleFavorite(board.id, event)}
+                        className={`cursor-pointer rounded-md p-1 ${isFav ? "text-brand" : "text-faint hover:text-ink"}`}
+                        title={isFav ? "Remove favorite" : "Mark favorite"}
+                      >
+                        <Star
+                          size={14}
+                          fill={isFav ? "currentColor" : "none"}
+                          aria-hidden
+                        />
+                      </button>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
+          </Card>
         </div>
 
-        <div className="portal-grid__sidebar">
-          <div className="portal-card">
-            <div className="portal-card__header">
-              <div>
-                <h3 className="portal-card__title">Top Contributors</h3>
-                <span className="portal-card__subtitle">
-                  Work items closed this period
-                </span>
-              </div>
-            </div>
-            <div className="portal-contributors">
-              <div className="portal-contributor">
-                <div className="portal-contributor__rank">1</div>
-                <div className="portal-contributor__avatar">AP</div>
-                <div className="portal-contributor__meta">
-                  <span className="portal-contributor__name">Abhishek P.</span>
-                  <span className="portal-contributor__tasks">
-                    28 tasks completed
+        {/* Side column */}
+        <div className="space-y-5">
+          <Card>
+            <CardHeader
+              title="Top Contributors"
+              subtitle="Work items closed this period"
+            />
+            <div className="space-y-2.5">
+              {CONTRIBUTORS.map((person, index) => (
+                <div
+                  key={person.name}
+                  className="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5"
+                >
+                  <span className="w-4 text-center text-[12px] font-bold text-faint">
+                    {index + 1}
                   </span>
-                </div>
-                <Badge tone="accent">Top Lead</Badge>
-              </div>
-
-              <div className="portal-contributor">
-                <div className="portal-contributor__rank">2</div>
-                <div className="portal-contributor__avatar">SC</div>
-                <div className="portal-contributor__meta">
-                  <span className="portal-contributor__name">Sarah Connor</span>
-                  <span className="portal-contributor__tasks">
-                    19 tasks completed
+                  <Avatar name={person.name} />
+                  <span className="min-w-0 flex-1 leading-tight">
+                    <span className="block truncate text-[12.5px] font-bold text-ink">
+                      {person.name}
+                    </span>
+                    <span className="block text-[11px] text-faint">
+                      {person.tasks} tasks completed
+                    </span>
                   </span>
+                  <Badge tone={person.tone}>{person.badge}</Badge>
                 </div>
-                <Badge tone="success">Active</Badge>
-              </div>
-
-              <div className="portal-contributor">
-                <div className="portal-contributor__rank">3</div>
-                <div className="portal-contributor__avatar">AR</div>
-                <div className="portal-contributor__meta">
-                  <span className="portal-contributor__name">Alex Rivera</span>
-                  <span className="portal-contributor__tasks">
-                    14 tasks completed
-                  </span>
-                </div>
-                <Badge tone="default">Member</Badge>
-              </div>
+              ))}
             </div>
-          </div>
+          </Card>
 
-          <div className="portal-card" style={{ marginTop: 24 }}>
-            <div className="portal-card__header">
-              <h3 className="portal-card__title">Workspace Resource Health</h3>
+          <Card>
+            <CardHeader title="Workspace Resource Health" />
+            <div className="space-y-4">
+              <HealthRow
+                label="MongoDB Atlas Storage"
+                value="1.2 GB / 5 GB"
+                percent={24}
+              />
+              <HealthRow
+                label="File Vault Capacity"
+                value="4.8 GB / 20 GB"
+                percent={32}
+              />
+              <HealthRow
+                label="API Compute Allocation"
+                value="38% Peak"
+                percent={38}
+                tone="info"
+              />
             </div>
-            <div className="portal-health-list">
-              <div className="portal-health-item">
-                <div className="portal-health-item__header">
-                  <span>MongoDB Atlas Storage</span>
-                  <span className="bold">1.2 GB / 5 GB</span>
-                </div>
-                <div className="portal-progress">
-                  <div
-                    className="portal-progress__bar"
-                    style={{ width: "24%" }}
-                  />
-                </div>
-              </div>
-
-              <div className="portal-health-item">
-                <div className="portal-health-item__header">
-                  <span>File Vault Capacity</span>
-                  <span className="bold">4.8 GB / 20 GB</span>
-                </div>
-                <div className="portal-progress">
-                  <div
-                    className="portal-progress__bar"
-                    style={{ width: "32%" }}
-                  />
-                </div>
-              </div>
-
-              <div className="portal-health-item">
-                <div className="portal-health-item__header">
-                  <span>API Compute Allocation</span>
-                  <span className="bold">38% Peak</span>
-                </div>
-                <div className="portal-progress">
-                  <div
-                    className="portal-progress__bar"
-                    style={{ width: "38%" }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          </Card>
         </div>
       </div>
 
-      {createOpen && (
-        <div className="modal-backdrop" onClick={() => setCreateOpen(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-card__header">
-              <h3 className="modal-card__title">Create New Sprint Board</h3>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => setCreateOpen(false)}
+      {createOpen ? (
+        <Modal
+          title="Create New Sprint Board"
+          onClose={() => setCreateOpen(false)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                form="create-board-form"
+                disabled={!name.trim()}
+                loading={createMutation.isPending}
               >
-                <X size={16} />
-              </button>
-            </div>
-            <form onSubmit={handleCreateSubmit}>
-              <div className="modal-card__body">
-                <Field label="Board Name *">
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Q4 Sprint, Platform Engine"
-                    autoFocus
-                    required
-                  />
-                </Field>
-                <Field label="Description (optional)">
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Short summary of this board goals and team scope..."
-                    rows={3}
-                  />
-                </Field>
-              </div>
-              <div className="modal-card__footer">
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => setCreateOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn--primary"
-                  disabled={!name.trim() || createMutation.isPending}
-                >
-                  {createMutation.isPending ? "Creating..." : "Create Board"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {createWorkspaceOpen && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setCreateWorkspaceOpen(false)}
+                Create Board
+              </Button>
+            </>
+          }
         >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-card__header">
-              <h3 className="modal-card__title">Create New Workspace</h3>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => setCreateWorkspaceOpen(false)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <form onSubmit={handleCreateWorkspace}>
-              <div className="modal-card__body">
-                <Field label="Workspace Name *">
-                  <input
-                    value={wsName}
-                    onChange={(e) => setWsName(e.target.value)}
-                    placeholder="e.g. Engineering, APAC Operations"
-                    autoFocus
-                    required
-                  />
-                </Field>
-              </div>
-              <div className="modal-card__footer">
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => setCreateWorkspaceOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn--primary"
-                  disabled={!wsName.trim() || createWorkspaceMutation.isPending}
-                >
-                  {createWorkspaceMutation.isPending
-                    ? "Creating..."
-                    : "Create Workspace"}
-                </button>
-              </div>
-            </form>
-          </div>
+          <form
+            id="create-board-form"
+            onSubmit={handleCreateSubmit}
+            className="space-y-4"
+          >
+            <Field label="Board name">
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="e.g. Q4 Sprint, Platform Engine"
+                autoFocus
+                maxLength={120}
+                required
+              />
+            </Field>
+            <Field label="Description (optional)">
+              <Textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Short summary of this board's goals and team scope…"
+                rows={3}
+              />
+            </Field>
+          </form>
+        </Modal>
+      ) : null}
+
+      {createWorkspaceOpen ? (
+        <CreateWorkspaceModal onClose={() => setCreateWorkspaceOpen(false)} />
+      ) : null}
+    </div>
+  );
+}
+
+const RECENT_TASKS = [
+  {
+    id: "TSK-1042",
+    board: "Core Engine",
+    assignee: "Abhishek P.",
+    date: "Today, 14:20",
+    status: "Active" as const,
+  },
+  {
+    id: "TSK-1041",
+    board: "UI Platform",
+    assignee: "Sarah Connor",
+    date: "Today, 11:05",
+    status: "Completed" as const,
+  },
+  {
+    id: "TSK-1040",
+    board: "Infra Cluster",
+    assignee: "Alex Rivera",
+    date: "Yesterday",
+    status: "Completed" as const,
+  },
+  {
+    id: "TSK-1039",
+    board: "API Gateway",
+    assignee: "Dev Team",
+    date: "Sep 24, 2026",
+    status: "Pending" as const,
+  },
+  {
+    id: "TSK-1038",
+    board: "Security Audit",
+    assignee: "Abhishek P.",
+    date: "Sep 23, 2026",
+    status: "Completed" as const,
+  },
+];
+
+const CONTRIBUTORS: {
+  name: string;
+  tasks: number;
+  badge: string;
+  tone: "brand" | "success" | "default";
+}[] = [
+  { name: "Abhishek Prajapati", tasks: 28, badge: "Top Lead", tone: "brand" },
+  { name: "Sarah Connor", tasks: 19, badge: "Active", tone: "success" },
+  { name: "Alex Rivera", tasks: 14, badge: "Member", tone: "default" },
+];
+
+function KpiCard({
+  label,
+  value,
+  subtext,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  subtext: string;
+  icon: typeof Kanban;
+  tone: "brand" | "info" | "ok" | "violet";
+}) {
+  const toneClass =
+    tone === "brand"
+      ? "bg-brand-soft text-brand"
+      : tone === "info"
+        ? "bg-info-soft text-info"
+        : tone === "ok"
+          ? "bg-ok-soft text-ok"
+          : "bg-violet-500/15 text-violet-500";
+  return (
+    <Card className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-[12px] font-semibold text-muted">{label}</div>
+        <div className="mt-1 text-[26px] font-extrabold leading-8 tracking-tight text-ink">
+          {value}
         </div>
-      )}
+        <div className="mt-1 truncate text-[11.5px] text-faint">{subtext}</div>
+      </div>
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
+      >
+        <Icon size={18} aria-hidden />
+      </span>
+    </Card>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  delta,
+  tone,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  delta: string;
+  tone: "up" | "down" | "flat";
+  icon: typeof Kanban;
+}) {
+  return (
+    <Card>
+      <div className="flex items-center justify-between">
+        <span className="text-[11.5px] font-semibold text-muted">{label}</span>
+        <Icon size={14} className="text-faint" aria-hidden />
+      </div>
+      <div className="mt-1.5 text-[20px] font-extrabold tracking-tight text-ink">
+        {value}
+      </div>
+      <div
+        className={`mt-1 text-[11px] font-semibold ${
+          tone === "up"
+            ? "text-ok"
+            : tone === "down"
+              ? "text-danger"
+              : "text-faint"
+        }`}
+      >
+        {delta}
+      </div>
+    </Card>
+  );
+}
+
+function HealthRow({
+  label,
+  value,
+  percent,
+  tone = "brand",
+}: {
+  label: string;
+  value: string;
+  percent: number;
+  tone?: "brand" | "info";
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-[11.5px]">
+        <span className="font-semibold text-muted">{label}</span>
+        <span className="font-bold text-ink">{value}</span>
+      </div>
+      <ProgressBar value={percent} tone={tone} />
     </div>
   );
 }

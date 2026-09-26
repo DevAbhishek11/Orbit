@@ -20,6 +20,7 @@ type Status = "loading" | "anonymous" | "authenticated";
 interface AuthContextValue {
   status: Status;
   user: User | null;
+  accessToken: string | null;
   workspaces: Workspace[];
   workspaceId: string | null;
   workspace: Workspace | null;
@@ -49,6 +50,7 @@ export function useAuth(): AuthContextValue {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<Status>("loading");
+  const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: Role | null;
     }) => {
       setAccessToken(next.accessToken);
+      setAccessTokenState(next.accessToken);
       setUser(next.user);
       if (next.workspaceId) {
         setWorkspaceId(next.workspaceId);
@@ -86,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearSession = useCallback(() => {
     queryClient.clear();
     setAccessToken(null);
+    setAccessTokenState(null);
     setUser(null);
     setWorkspaces([]);
     setWorkspaceId(null);
@@ -97,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSessionHooks({
       onRefreshed: (auth) => {
+        setAccessTokenState(auth.accessToken);
         setUser(auth.user as User);
         if (auth.workspaceId) {
           setWorkspaceId(auth.workspaceId);
@@ -139,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const scope = await authApi.switchWorkspace(target);
         setAccessToken(scope.accessToken);
+        setAccessTokenState(scope.accessToken);
         setWorkspaceId(scope.workspaceId);
         setRole(scope.role);
         localStorage.setItem(WORKSPACE_KEY, scope.workspaceId);
@@ -196,6 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const selectWorkspace = useCallback(async (nextWorkspaceId: string) => {
     const scope = await authApi.switchWorkspace(nextWorkspaceId);
     setAccessToken(scope.accessToken);
+    setAccessTokenState(scope.accessToken);
     setWorkspaceId(scope.workspaceId);
     setRole(scope.role);
     localStorage.setItem(WORKSPACE_KEY, scope.workspaceId);
@@ -210,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       user,
+      accessToken,
       workspaces,
       workspaceId,
       workspace,
@@ -225,6 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       status,
       user,
+      accessToken,
       workspaces,
       workspaceId,
       workspace,

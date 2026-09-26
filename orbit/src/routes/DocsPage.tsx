@@ -1,27 +1,40 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  FilePlus2,
+  FileText,
+  History,
+  Plus,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react";
 import { pagesApi } from "../api/endpoints";
 import type { Page, PageBlock, PageVersion } from "../api/types";
-import { useAuth } from "../state/auth";
-import { useToast } from "../state/toast";
 import {
+  AppIcon,
   Badge,
+  Button,
   CenterState,
   ConfirmDialog,
   EmptyState,
   ErrorBox,
   Field,
+  Input,
   Modal,
-  Spinner,
+  Select,
+  Textarea,
 } from "../components/ui";
+import { useAuth } from "../state/auth";
+import { useToast } from "../state/toast";
 
 export function DocsPage() {
   const { workspaceId, role } = useAuth();
   const { pageId } = useParams();
   const queryClient = useQueryClient();
-  const toast = useToast();
   const navigate = useNavigate();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [newPageTitle, setNewPageTitle] = useState("");
@@ -56,7 +69,7 @@ export function DocsPage() {
     mutationFn: (data: { title: string; parentId?: string | null }) =>
       pagesApi.create(workspaceId as string, data),
     onSuccess: (res) => {
-      toast.success("Doc created");
+      toastSuccess("Doc created");
       void queryClient.invalidateQueries({
         queryKey: ["pages-tree", workspaceId],
       });
@@ -65,156 +78,108 @@ export function DocsPage() {
       setParentForNewPage(null);
       navigate(`/docs/${res.page.id}`);
     },
-    onError: (err: Error) => toast.error("Could not create doc", err.message),
+    onError: (err: Error) => toastError("Could not create doc", err.message),
   });
 
   return (
-    <div
-      className="docs-layout"
-      style={{ display: "flex", height: "calc(100vh - 56px)" }}
-    >
-      {}
-      <aside
-        className="docs-sidebar"
-        style={{
-          width: 280,
-          borderRight: "1px solid var(--border)",
-          padding: "16px 12px",
-          display: "flex",
-          flexDirection: "column",
-          background: "var(--surface-muted, var(--surface))",
-          overflowY: "auto",
-        }}
-      >
-        <div className="row row--between" style={{ marginBottom: 12 }}>
-          <strong
-            style={{
-              fontSize: 13,
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
+    <div className="flex h-[calc(100vh-56px)]">
+      <aside className="flex w-[264px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface/60 p-3">
+        <div className="mb-2 flex items-center justify-between px-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">
             Docs & Wiki
-          </strong>
-          {!readOnly && (
-            <button
-              type="button"
-              className="btn btn--ghost btn--icon"
-              title="New Doc"
+          </span>
+          {!readOnly ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title="New doc"
               onClick={() => {
                 setParentForNewPage(null);
                 setCreateModalOpen(true);
               }}
             >
-              +
-            </button>
-          )}
+              <Plus size={14} />
+            </Button>
+          ) : null}
         </div>
 
-        {treeQuery.isLoading && <Spinner />}
+        {treeQuery.isLoading ? <CenterState>Loading docs…</CenterState> : null}
 
-        <nav className="stack" style={{ gap: 2 }}>
-          {pages.map((p) => {
-            const isSelected = p.id === pageId;
-            const indent = Math.min((p.depth ?? 0) * 14, 56);
+        <nav className="space-y-0.5">
+          {pages.map((page) => {
+            const isSelected = page.id === pageId;
+            const indent = Math.min((page.depth ?? 0) * 14, 56);
             return (
               <div
-                key={p.id}
-                className="row row--between"
-                style={{
-                  paddingLeft: indent,
-                  borderRadius: 6,
-                  background: isSelected
-                    ? "var(--accent-subtle)"
-                    : "transparent",
-                }}
+                key={page.id}
+                className="group flex items-center gap-1 rounded-lg pr-1 transition-colors hover:bg-sunken"
+                style={{ paddingLeft: indent }}
               >
                 <button
                   type="button"
-                  className="btn btn--ghost grow"
-                  style={{
-                    textAlign: "left",
-                    justifyContent: "flex-start",
-                    gap: 6,
-                    padding: "6px 8px",
-                    fontWeight: isSelected ? 600 : 400,
-                  }}
-                  onClick={() => navigate(`/docs/${p.id}`)}
+                  onClick={() => navigate(`/docs/${page.id}`)}
+                  className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] transition-colors ${
+                    isSelected
+                      ? "bg-brand-soft font-bold text-brand"
+                      : "font-medium text-muted hover:text-ink"
+                  }`}
                 >
-                  <span>{p.icon || "📄"}</span>
-                  <span
-                    style={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {p.title || "Untitled"}
-                  </span>
+                  <AppIcon name={page.icon} size={14} className="shrink-0" />
+                  <span className="truncate">{page.title || "Untitled"}</span>
                 </button>
-                {!readOnly && (
+                {!readOnly ? (
                   <button
                     type="button"
-                    className="btn btn--ghost btn--icon"
-                    style={{ width: 22, height: 22, opacity: 0.6 }}
                     title="Add sub-page"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setParentForNewPage(p.id);
+                    className="cursor-pointer rounded p-1 text-faint opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setParentForNewPage(page.id);
                       setCreateModalOpen(true);
                     }}
                   >
-                    +
+                    <Plus size={13} />
                   </button>
-                )}
+                ) : null}
               </div>
             );
           })}
-          {pages.length === 0 && !treeQuery.isLoading && (
-            <p className="faint" style={{ fontSize: 12.5, margin: "12px 0" }}>
+          {pages.length === 0 && !treeQuery.isLoading ? (
+            <p className="px-2 py-3 text-[12px] text-faint">
               No docs yet. Create your first doc!
             </p>
-          )}
+          ) : null}
         </nav>
       </aside>
 
-      {}
-      <main
-        className="docs-content grow"
-        style={{ overflowY: "auto", padding: "32px 48px" }}
-      >
-        {pageQuery.isLoading && (
-          <CenterState>
-            <Spinner large />
-            <div>Loading doc…</div>
-          </CenterState>
-        )}
+      <main className="min-w-0 flex-1 overflow-y-auto px-6 py-8 lg:px-12">
+        {pageQuery.isLoading ? <CenterState>Loading doc…</CenterState> : null}
 
-        {pageQuery.isError && (
+        {pageQuery.isError ? (
           <ErrorBox
             message="Could not load page"
             requestId={(pageQuery.error as { requestId?: string })?.requestId}
           />
-        )}
+        ) : null}
 
-        {!pageId && pages.length === 0 && !treeQuery.isLoading && (
+        {!pageId && pages.length === 0 && !treeQuery.isLoading ? (
           <EmptyState
-            icon="📄"
+            icon={FileText}
             title="Knowledge Base & Docs"
             hint="Create nested docs, wikis, and structured notes with version history."
             action={
-              <button
-                type="button"
-                className="btn btn--primary"
+              <Button
+                variant="primary"
+                icon={FilePlus2}
                 onClick={() => setCreateModalOpen(true)}
               >
-                + New Document
-              </button>
+                New Document
+              </Button>
             }
           />
-        )}
+        ) : null}
 
-        {activePage && (
+        {activePage ? (
           <DocEditor
             key={activePage.id}
             activePage={activePage}
@@ -223,19 +188,36 @@ export function DocsPage() {
             onOpenVersions={() => setVersionsModalOpen(true)}
             onDeleted={() => navigate("/docs")}
           />
-        )}
+        ) : null}
       </main>
 
-      {}
-      {createModalOpen && (
+      {createModalOpen ? (
         <Modal
           title="Create New Document"
           onClose={() => setCreateModalOpen(false)}
-          wide={false}
+          size="sm"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setCreateModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                form="create-doc-form"
+                disabled={!newPageTitle.trim()}
+                loading={createMutation.isPending}
+              >
+                Create Doc
+              </Button>
+            </>
+          }
         >
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
+            id="create-doc-form"
+            className="space-y-4"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
               if (newPageTitle.trim()) {
                 createMutation.mutate({
                   title: newPageTitle.trim(),
@@ -243,50 +225,30 @@ export function DocsPage() {
                 });
               }
             }}
-            className="stack"
-            style={{ gap: 12 }}
           >
             <Field label="Title">
-              <input
-                className="input"
+              <Input
                 autoFocus
                 value={newPageTitle}
-                onChange={(e) => setNewPageTitle(e.target.value)}
+                onChange={(event) => setNewPageTitle(event.target.value)}
                 placeholder="e.g. Product Requirements or Team Wiki"
               />
             </Field>
-            {parentForNewPage && (
-              <p className="faint" style={{ fontSize: 12 }}>
-                This doc will be nested under selected parent.
+            {parentForNewPage ? (
+              <p className="text-[12px] text-faint">
+                This doc will be nested under the selected parent.
               </p>
-            )}
-            <div className="row row--end" style={{ gap: 8, marginTop: 12 }}>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setCreateModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn--primary"
-                disabled={!newPageTitle.trim() || createMutation.isPending}
-              >
-                {createMutation.isPending ? <Spinner /> : "Create Doc"}
-              </button>
-            </div>
+            ) : null}
           </form>
         </Modal>
-      )}
+      ) : null}
 
-      {}
-      {versionsModalOpen && pageId && (
+      {versionsModalOpen && pageId ? (
         <VersionHistoryModal
           pageId={pageId}
           onClose={() => setVersionsModalOpen(false)}
         />
-      )}
+      ) : null}
     </div>
   );
 }
@@ -385,30 +347,26 @@ function DocEditor({
   };
 
   const updateBlock = (index: number, content: string) => {
-    const updated = [...blocks];
-    if (updated[index]) {
-      updated[index] = { ...updated[index], content };
-      setBlocks(updated);
-      setIsDirty(true);
-    }
+    setBlocks((current) =>
+      current.map((block, i) => (i === index ? { ...block, content } : block)),
+    );
+    setIsDirty(true);
   };
 
   const changeBlockType = (index: number, type: PageBlock["type"]) => {
-    const updated = [...blocks];
-    if (updated[index]) {
-      updated[index] = { ...updated[index], type };
-      setBlocks(updated);
-      setIsDirty(true);
-    }
+    setBlocks((current) =>
+      current.map((block, i) => (i === index ? { ...block, type } : block)),
+    );
+    setIsDirty(true);
   };
 
   const toggleTodo = (index: number) => {
-    const updated = [...blocks];
-    if (updated[index]) {
-      updated[index] = { ...updated[index], checked: !updated[index].checked };
-      setBlocks(updated);
-      setIsDirty(true);
-    }
+    setBlocks((current) =>
+      current.map((block, i) =>
+        i === index ? { ...block, checked: !block.checked } : block,
+      ),
+    );
+    setIsDirty(true);
   };
 
   const addBlock = (
@@ -421,118 +379,104 @@ function DocEditor({
       content: "",
       order: String(Date.now()),
     };
-    const updated = [...blocks];
-    updated.splice(afterIndex + 1, 0, newBlock);
-    setBlocks(updated);
+    setBlocks((current) => {
+      const next = [...current];
+      next.splice(afterIndex + 1, 0, newBlock);
+      return next;
+    });
     setIsDirty(true);
   };
 
   const removeBlock = (index: number) => {
     if (blocks.length <= 1) return;
-    const updated = blocks.filter((_, i) => i !== index);
-    setBlocks(updated);
+    setBlocks((current) => current.filter((_, i) => i !== index));
     setIsDirty(true);
   };
 
+  const isFavourite = Boolean(activePage.favouriteOf?.length);
+
   return (
-    <div style={{ maxWidth: 840, margin: "0 auto" }}>
-      {}
-      <div
-        className="row row--between"
-        style={{
-          marginBottom: 24,
-          paddingBottom: 12,
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div className="row" style={{ gap: 8 }}>
-          <span style={{ fontSize: 24 }}>{activePage.icon || "📄"}</span>
-          <Badge tone="accent">v{activePage.version}</Badge>
-          {lastSavedAt && (
-            <span className="faint" style={{ fontSize: 12 }}>
+    <div className="mx-auto max-w-[840px]">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand">
+            <AppIcon name={activePage.icon} size={16} />
+          </span>
+          <Badge tone="brand">v{activePage.version}</Badge>
+          {lastSavedAt ? (
+            <span className="text-[11.5px] text-faint">
               Saved {lastSavedAt.toLocaleTimeString()}
             </span>
-          )}
-          {isDirty && <Badge tone="warning">Unsaved changes</Badge>}
+          ) : null}
+          {isDirty ? <Badge tone="warning">Unsaved changes</Badge> : null}
         </div>
-        <div className="row" style={{ gap: 8 }}>
-          <button
-            type="button"
-            className="btn btn--ghost btn--icon"
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant={isFavourite ? "soft" : "ghost"}
+            size="icon-sm"
             title="Toggle favourite"
             onClick={() => favouriteMutation.mutate()}
           >
-            ⭐
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost"
+            <Star size={14} fill={isFavourite ? "currentColor" : "none"} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={History}
             onClick={onOpenVersions}
           >
             Version history
-          </button>
-          {!readOnly && isDirty && (
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={saveMutation.isPending}
+          </Button>
+          {!readOnly && isDirty ? (
+            <Button
+              variant="primary"
+              size="sm"
+              loading={saveMutation.isPending}
               onClick={handleSave}
             >
-              {saveMutation.isPending ? <Spinner /> : "Save doc"}
-            </button>
-          )}
-          {!readOnly && (
-            <button
-              type="button"
-              className="btn btn--ghost btn--icon"
+              Save doc
+            </Button>
+          ) : null}
+          {!readOnly ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
               title="Delete doc"
+              className="text-danger hover:bg-danger-soft hover:text-danger"
               onClick={() => setConfirmDelete(true)}
             >
-              🗑
-            </button>
-          )}
+              <Trash2 size={14} />
+            </Button>
+          ) : null}
         </div>
       </div>
 
-      {}
       <input
-        className="input"
         value={title}
         disabled={readOnly}
-        onChange={(e) => {
-          setTitle(e.target.value);
+        onChange={(event) => {
+          setTitle(event.target.value);
           setIsDirty(true);
         }}
         onBlur={handleSave}
         placeholder="Untitled Document"
-        style={{
-          fontSize: 28,
-          fontWeight: 700,
-          border: "none",
-          background: "transparent",
-          padding: "4px 0",
-          marginBottom: 24,
-          boxShadow: "none",
-        }}
+        className="mb-6 w-full bg-transparent text-[26px] font-extrabold tracking-tight text-ink placeholder:text-faint focus:outline-none disabled:opacity-70"
       />
 
-      {}
-      <div className="stack" style={{ gap: 12 }}>
+      <div className="space-y-2.5">
         {blocks.map((block, index) => (
-          <div
-            key={block.id || index}
-            className="block-row row"
-            style={{ gap: 8, alignItems: "flex-start" }}
-          >
-            {}
-            {!readOnly && (
-              <select
-                className="select"
-                style={{ width: 100, fontSize: 11, padding: "4px 6px" }}
+          <div key={block.id || index} className="group flex items-start gap-2">
+            {!readOnly ? (
+              <Select
                 value={block.type}
-                onChange={(e) =>
-                  changeBlockType(index, e.target.value as PageBlock["type"])
+                onChange={(event) =>
+                  changeBlockType(
+                    index,
+                    event.target.value as PageBlock["type"],
+                  )
                 }
+                className="w-[104px] shrink-0 pt-0.5"
+                aria-label="Block type"
               >
                 <option value="paragraph">Text</option>
                 <option value="h1">Heading 1</option>
@@ -542,150 +486,115 @@ function DocEditor({
                 <option value="quote">Quote</option>
                 <option value="code">Code</option>
                 <option value="divider">Divider</option>
-              </select>
-            )}
+              </Select>
+            ) : null}
 
-            {}
-            <div className="grow">
-              {block.type === "h1" ? (
-                <input
-                  className="input"
-                  value={block.content}
-                  disabled={readOnly}
-                  onChange={(e) => updateBlock(index, e.target.value)}
-                  onBlur={handleSave}
-                  placeholder="Heading 1"
-                  style={{ fontSize: 22, fontWeight: 700 }}
-                />
-              ) : block.type === "h2" ? (
-                <input
-                  className="input"
-                  value={block.content}
-                  disabled={readOnly}
-                  onChange={(e) => updateBlock(index, e.target.value)}
-                  onBlur={handleSave}
-                  placeholder="Heading 2"
-                  style={{ fontSize: 18, fontWeight: 600 }}
-                />
-              ) : block.type === "h3" ? (
-                <input
-                  className="input"
-                  value={block.content}
-                  disabled={readOnly}
-                  onChange={(e) => updateBlock(index, e.target.value)}
-                  onBlur={handleSave}
-                  placeholder="Heading 3"
-                  style={{ fontSize: 15, fontWeight: 600 }}
-                />
+            <div className="min-w-0 flex-1">
+              {block.type === "divider" ? (
+                <hr className="my-3 border-line" />
               ) : block.type === "todo" ? (
-                <div className="row" style={{ gap: 8 }}>
+                <div className="flex items-center gap-2.5">
                   <input
                     type="checkbox"
                     checked={Boolean(block.checked)}
                     disabled={readOnly}
                     onChange={() => toggleTodo(index)}
+                    className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--brand)]"
                   />
-                  <input
-                    className="input grow"
+                  <Input
                     value={block.content}
                     disabled={readOnly}
-                    onChange={(e) => updateBlock(index, e.target.value)}
+                    onChange={(event) => updateBlock(index, event.target.value)}
                     onBlur={handleSave}
                     placeholder="To-do item"
-                    style={{
-                      textDecoration: block.checked ? "line-through" : "none",
-                      opacity: block.checked ? 0.6 : 1,
-                    }}
+                    className={block.checked ? "opacity-60 line-through" : ""}
                   />
                 </div>
               ) : block.type === "quote" ? (
-                <textarea
-                  className="textarea"
+                <Textarea
                   value={block.content}
                   disabled={readOnly}
-                  onChange={(e) => updateBlock(index, e.target.value)}
+                  onChange={(event) => updateBlock(index, event.target.value)}
                   onBlur={handleSave}
-                  placeholder="Quote..."
-                  style={{
-                    borderLeft: "3px solid var(--accent)",
-                    fontStyle: "italic",
-                    minHeight: 60,
-                  }}
+                  placeholder="Quote…"
+                  className="border-l-[3px] border-l-brand italic"
                 />
               ) : block.type === "code" ? (
-                <textarea
-                  className="textarea"
+                <Textarea
                   value={block.content}
                   disabled={readOnly}
-                  onChange={(e) => updateBlock(index, e.target.value)}
+                  onChange={(event) => updateBlock(index, event.target.value)}
                   onBlur={handleSave}
-                  placeholder="Code block..."
-                  style={{
-                    fontFamily: "monospace",
-                    fontSize: 13,
-                    minHeight: 80,
-                    background: "var(--surface-muted)",
-                  }}
+                  placeholder="Code block…"
+                  className="bg-sunken font-mono text-[12.5px]"
                 />
-              ) : block.type === "divider" ? (
-                <hr
-                  style={{
-                    border: "none",
-                    borderTop: "1px solid var(--border)",
-                    margin: "12px 0",
-                  }}
+              ) : block.type === "h1" ||
+                block.type === "h2" ||
+                block.type === "h3" ? (
+                <Input
+                  value={block.content}
+                  disabled={readOnly}
+                  onChange={(event) => updateBlock(index, event.target.value)}
+                  onBlur={handleSave}
+                  placeholder={`Heading ${block.type[1]}`}
+                  className={
+                    block.type === "h1"
+                      ? "h-auto border-transparent bg-transparent py-1 text-[21px] font-extrabold"
+                      : block.type === "h2"
+                        ? "h-auto border-transparent bg-transparent py-1 text-[17px] font-bold"
+                        : "h-auto border-transparent bg-transparent py-1 text-[14.5px] font-bold"
+                  }
                 />
               ) : (
-                <textarea
-                  className="textarea"
+                <Textarea
                   value={block.content}
                   disabled={readOnly}
-                  onChange={(e) => updateBlock(index, e.target.value)}
+                  onChange={(event) => updateBlock(index, event.target.value)}
                   onBlur={handleSave}
-                  placeholder="Type something..."
+                  placeholder="Type something…"
                   rows={2}
+                  className="border-transparent bg-transparent focus:border-brand"
                 />
               )}
             </div>
 
-            {}
-            {!readOnly && (
-              <div className="row" style={{ gap: 4 }}>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--icon"
+            {!readOnly ? (
+              <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   title="Add block below"
                   onClick={() => addBlock(index)}
                 >
-                  +
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--icon"
+                  <Plus size={13} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   title="Remove block"
                   onClick={() => removeBlock(index)}
                 >
-                  ×
-                </button>
+                  <X size={13} />
+                </Button>
               </div>
-            )}
+            ) : null}
           </div>
         ))}
       </div>
 
-      {!readOnly && (
-        <button
-          type="button"
-          className="btn btn--ghost"
-          style={{ marginTop: 24 }}
+      {!readOnly ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-5"
+          icon={Plus}
           onClick={() => addBlock(blocks.length - 1)}
         >
-          + Add block
-        </button>
-      )}
+          Add block
+        </Button>
+      ) : null}
 
-      {}
-      {confirmDelete && (
+      {confirmDelete ? (
         <ConfirmDialog
           title="Delete document?"
           body="Deleting this doc will also soft-delete all its sub-pages. It can be restored later."
@@ -695,7 +604,7 @@ function DocEditor({
           onConfirm={() => deleteMutation.mutate()}
           onClose={() => setConfirmDelete(false)}
         />
-      )}
+      ) : null}
     </div>
   );
 }
@@ -729,39 +638,39 @@ function VersionHistoryModal({
   const versions = versionsQuery.data?.versions ?? [];
 
   return (
-    <Modal title="Version History" onClose={onClose} wide={false}>
-      {versionsQuery.isLoading && <Spinner />}
-      <div
-        className="stack"
-        style={{ gap: 8, maxHeight: 380, overflowY: "auto" }}
-      >
-        {versions.map((v: PageVersion) => (
+    <Modal title="Version History" onClose={onClose}>
+      {versionsQuery.isLoading ? (
+        <CenterState>Loading versions…</CenterState>
+      ) : null}
+      <div className="max-h-[380px] space-y-2 overflow-y-auto">
+        {versions.map((version: PageVersion) => (
           <div
-            key={v.id || v._id}
-            className="row row--between panel"
-            style={{ padding: "10px 14px" }}
+            key={version.id || version._id}
+            className="flex items-center justify-between gap-3 rounded-lg border border-line px-3.5 py-2.5"
           >
-            <div>
-              <div style={{ fontWeight: 600 }}>
-                v{v.version} — {v.title}
+            <div className="min-w-0">
+              <div className="truncate text-[12.5px] font-bold text-ink">
+                v{version.version} — {version.title}
               </div>
-              <div className="faint" style={{ fontSize: 12 }}>
-                {new Date(v.createdAt).toLocaleString()} · {v.snapshotReason}
+              <div className="text-[11px] text-faint">
+                {new Date(version.createdAt).toLocaleString()} ·{" "}
+                {version.snapshotReason}
               </div>
             </div>
-            <button
-              type="button"
-              className="btn btn--sm"
-              disabled={restoreMutation.isPending}
-              onClick={() => restoreMutation.mutate(v.id || v._id)}
+            <Button
+              size="xs"
+              loading={restoreMutation.isPending}
+              onClick={() => restoreMutation.mutate(version.id || version._id)}
             >
               Restore
-            </button>
+            </Button>
           </div>
         ))}
-        {versions.length === 0 && !versionsQuery.isLoading && (
-          <p className="faint">No previous snapshots recorded.</p>
-        )}
+        {versions.length === 0 && !versionsQuery.isLoading ? (
+          <p className="py-2 text-[12.5px] text-faint">
+            No previous snapshots recorded.
+          </p>
+        ) : null}
       </div>
     </Modal>
   );

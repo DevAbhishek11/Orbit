@@ -1,20 +1,26 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MailPlus, RefreshCw, UserPlus } from "lucide-react";
 import { ApiError } from "../api/client";
 import { workspacesApi } from "../api/endpoints";
 import type { Member, Role } from "../api/types";
-import { useAuth } from "../state/auth";
-import { useToast } from "../state/toast";
 import {
   Avatar,
   Badge,
+  Button,
+  Card,
   CenterState,
   ConfirmDialog,
   EmptyState,
   ErrorBox,
-  Spinner,
+  Field,
+  Input,
+  PageHeader,
+  Select,
 } from "../components/ui";
+import { useAuth } from "../state/auth";
+import { useToast } from "../state/toast";
 
 const GRANTABLE: Role[] = ["admin", "manager", "member", "viewer"];
 const RANK: Record<Role, number> = {
@@ -87,13 +93,11 @@ export function MembersPage() {
 
   if (!workspaceId) {
     return (
-      <div className="page">
-        <EmptyState
-          icon="◍"
-          title="No workspace selected"
-          hint="Create or join a workspace first."
-        />
-      </div>
+      <EmptyState
+        icon={UserPlus}
+        title="No workspace selected"
+        hint="Create or join a workspace first."
+      />
     );
   }
 
@@ -110,135 +114,139 @@ export function MembersPage() {
   };
 
   return (
-    <div className="page">
-      <div className="page__header">
-        <div className="page__header-text">
-          <h1>Members</h1>
-          <p className="page__subtitle">
-            {members.length} people in this workspace
-          </p>
-        </div>
-        <Link className="btn btn--primary" to="/invitations">
-          Invite people
-        </Link>
-      </div>
+    <div className="mx-auto w-full max-w-[1000px] px-5 py-6">
+      <PageHeader
+        title="Members"
+        subtitle={`${members.length} people in this workspace`}
+        actions={
+          <Link to="/invitations">
+            <Button variant="primary" icon={MailPlus}>
+              Invite people
+            </Button>
+          </Link>
+        }
+      />
 
       {membersQuery.isError ? (
         <ErrorBox message={(membersQuery.error as ApiError).message} />
       ) : null}
 
-      <div
-        className="panel panel--tight"
-        style={{ padding: 0, overflow: "hidden" }}
-      >
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Person</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Joined</th>
-              <th style={{ textAlign: "right" }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((member) => (
-              <tr key={member.userId}>
-                <td>
-                  <div className="row" style={{ gap: 10 }}>
-                    <Avatar name={member.name} url={member.avatarUrl} />
-                    <div>
-                      <div style={{ fontWeight: 500 }}>
-                        {member.name}
-                        {member.userId === user?.id ? (
-                          <span className="faint"> (you)</span>
-                        ) : null}
-                      </div>
-                      <div className="faint" style={{ fontSize: 12 }}>
-                        {member.email ?? member.handle}
+      <Card padded={false} className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse text-left">
+            <thead>
+              <tr className="border-b border-line text-[10.5px] font-bold uppercase tracking-wider text-faint">
+                <th className="px-4 py-2.5">Person</th>
+                <th className="px-4 py-2.5">Role</th>
+                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5">Joined</th>
+                <th className="px-4 py-2.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((member) => (
+                <tr
+                  key={member.userId}
+                  className="border-b border-line/60 last:border-0 hover:bg-sunken/40"
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar name={member.name} url={member.avatarUrl} />
+                      <div className="min-w-0">
+                        <div className="truncate text-[12.5px] font-bold text-ink">
+                          {member.name}
+                          {member.userId === user?.id ? (
+                            <span className="font-normal text-faint">
+                              {" "}
+                              (you)
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="truncate text-[11.5px] text-faint">
+                          {member.email ?? member.handle}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </td>
-                <td>
-                  {canEdit(member) ? (
-                    <select
-                      className="select"
-                      style={{ width: 130 }}
-                      value={member.role}
-                      disabled={updateRole.isPending}
-                      onChange={(event) =>
-                        updateRole.mutate({
-                          userId: member.userId,
-                          next: event.target.value as Role,
-                        })
-                      }
-                    >
-                      {GRANTABLE.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <Badge
-                      tone={member.role === "owner" ? "accent" : "default"}
-                    >
-                      {member.role}
-                    </Badge>
-                  )}
-                </td>
-                <td>
-                  <Badge
-                    tone={member.status === "active" ? "success" : "warning"}
-                  >
-                    {member.status}
-                  </Badge>
-                </td>
-                <td className="faint">
-                  {new Date(member.joinedAt).toLocaleDateString()}
-                </td>
-                <td style={{ textAlign: "right" }}>
-                  {canEdit(member) ? (
-                    <div className="row" style={{ justifyContent: "flex-end" }}>
-                      <button
-                        type="button"
-                        className="btn btn--sm"
-                        disabled={setStatus.isPending}
-                        onClick={() =>
-                          setStatus.mutate({
+                  </td>
+                  <td className="px-4 py-3">
+                    {canEdit(member) ? (
+                      <Select
+                        value={member.role}
+                        disabled={updateRole.isPending}
+                        onChange={(event) =>
+                          updateRole.mutate({
                             userId: member.userId,
-                            status:
-                              member.status === "active"
-                                ? "suspended"
-                                : "active",
+                            next: event.target.value as Role,
                           })
                         }
+                        className="w-[124px]"
+                        aria-label={`Role for ${member.name}`}
                       >
-                        {member.status === "active" ? "Suspend" : "Reactivate"}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--sm btn--danger"
-                        onClick={() => setRemoving(member)}
+                        {GRANTABLE.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Badge
+                        tone={member.role === "owner" ? "brand" : "default"}
                       >
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="faint" style={{ fontSize: 12 }}>
-                      —
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                        {member.role}
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      tone={member.status === "active" ? "success" : "warning"}
+                    >
+                      {member.status}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-[12px] text-faint">
+                    {new Date(member.joinedAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    {canEdit(member) ? (
+                      <div className="flex justify-end gap-1.5">
+                        <Button
+                          size="xs"
+                          disabled={setStatus.isPending}
+                          onClick={() =>
+                            setStatus.mutate({
+                              userId: member.userId,
+                              status:
+                                member.status === "active"
+                                  ? "suspended"
+                                  : "active",
+                            })
+                          }
+                        >
+                          {member.status === "active"
+                            ? "Suspend"
+                            : "Reactivate"}
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="danger"
+                          onClick={() => setRemoving(member)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-[12px] text-faint">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {members.length === 0 ? (
-          <EmptyState icon="◍" title="No members yet" />
+          <EmptyState icon={UserPlus} title="No members yet" />
         ) : null}
-      </div>
+      </Card>
 
       {removing ? (
         <ConfirmDialog
@@ -286,159 +294,159 @@ export function InvitationsPage() {
 
   if (!workspaceId) {
     return (
-      <div className="page">
-        <EmptyState
-          icon="✉"
-          title="No workspace selected"
-          hint="Create or join a workspace first."
-        />
-      </div>
+      <EmptyState
+        icon={MailPlus}
+        title="No workspace selected"
+        hint="Create or join a workspace first."
+      />
     );
   }
 
   const canInvite = role === "owner" || role === "admin" || role === "manager";
 
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (email.trim()) invite.mutate();
+  };
+
   return (
-    <div className="page">
-      <div className="page__header">
-        <div className="page__header-text">
-          <h1>Invitations</h1>
-          <p className="page__subtitle">
-            {workspace?.name} · free plan seats are limited to the workspace
-            seat limit
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[900px] px-5 py-6">
+      <PageHeader
+        title="Invitations"
+        subtitle={`${workspace?.name} · seats are limited by the workspace plan`}
+      />
 
       {canInvite ? (
-        <div className="panel" style={{ marginBottom: 20 }}>
-          <h2 style={{ marginBottom: 12 }}>Invite someone</h2>
-          <div className="row row--wrap" style={{ alignItems: "flex-end" }}>
-            <div className="grow" style={{ minWidth: 240 }}>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field__label">Email</span>
-                <input
-                  className="input"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="teammate@company.com"
-                />
-              </label>
-            </div>
-            <label className="field" style={{ marginBottom: 0 }}>
-              <span className="field__label">Role</span>
-              <select
-                className="select"
+        <Card className="mb-5">
+          <form
+            onSubmit={submit}
+            className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_160px_auto]"
+          >
+            <Field label="Email address">
+              <Input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="teammate@company.com"
+                required
+              />
+            </Field>
+            <Field label="Role">
+              <Select
                 value={inviteRole}
                 onChange={(event) =>
                   setInviteRole(event.target.value as Exclude<Role, "owner">)
                 }
               >
-                <option value="admin">admin</option>
-                <option value="manager">manager</option>
-                <option value="member">member</option>
-                <option value="viewer">viewer</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={invite.isPending || !email.trim()}
-              onClick={() => invite.mutate()}
-            >
-              {invite.isPending ? <Spinner /> : null}
-              Send invite
-            </button>
-          </div>
-
-          {issuedToken ? (
-            <div className="info-box" style={{ marginTop: 16 }}>
-              <strong>Dev-only accept link</strong> — SMTP is not wired yet, so
-              the API returned the raw token instead of emailing it. It is
-              single-use and expires in 72 hours.
-              <div
-                className="mono"
-                style={{ marginTop: 6, wordBreak: "break-all" }}
+                {(["admin", "manager", "member", "viewer"] as const).map(
+                  (value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ),
+                )}
+              </Select>
+            </Field>
+            <div className="flex items-end">
+              <Button
+                type="submit"
+                variant="primary"
+                icon={MailPlus}
+                loading={invite.isPending}
+                disabled={!email.trim()}
               >
-                /invites/{issuedToken}
-              </div>
+                Send invite
+              </Button>
+            </div>
+          </form>
+          {issuedToken ? (
+            <div className="mt-4 rounded-lg border border-info/30 bg-info-soft px-3.5 py-2.5 text-[12px] text-info">
+              Mail delivery is not configured — share this accept link manually:{" "}
+              <code className="break-all font-mono text-[11px]">
+                {`${window.location.origin}/invites/${issuedToken}`}
+              </code>
             </div>
           ) : null}
-        </div>
+        </Card>
       ) : null}
 
-      <div
-        className="panel panel--tight"
-        style={{ padding: 0, overflow: "hidden" }}
-      >
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Role</th>
-              <th>State</th>
-              <th>Invited</th>
-              <th>Expires</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(invitesQuery.data?.invites ?? []).map((item) => (
-              <tr key={item.id}>
-                <td>{item.email}</td>
-                <td>
-                  <Badge>{item.role}</Badge>
-                </td>
-                <td>
-                  <Badge
-                    tone={
-                      item.state === "pending"
-                        ? "accent"
-                        : item.state === "accepted"
-                          ? "success"
-                          : "default"
-                    }
-                  >
-                    {item.state}
-                  </Badge>
-                </td>
-                <td className="faint">
-                  {new Date(item.createdAt).toLocaleDateString()}
-                </td>
-                <td className="faint">
-                  {new Date(item.expiresAt).toLocaleString()}
-                </td>
+      <Card padded={false} className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] border-collapse text-left">
+            <thead>
+              <tr className="border-b border-line text-[10.5px] font-bold uppercase tracking-wider text-faint">
+                <th className="px-4 py-2.5">Email</th>
+                <th className="px-4 py-2.5">Role</th>
+                <th className="px-4 py-2.5">State</th>
+                <th className="px-4 py-2.5">Invited</th>
+                <th className="px-4 py-2.5">Expires</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(invitesQuery.data?.invites ?? []).map((item) => (
+                <tr
+                  key={item.id}
+                  className="border-b border-line/60 last:border-0 hover:bg-sunken/40"
+                >
+                  <td className="px-4 py-3 text-[12.5px] font-semibold text-ink">
+                    {item.email}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge>{item.role}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      tone={
+                        item.state === "pending"
+                          ? "brand"
+                          : item.state === "accepted"
+                            ? "success"
+                            : "default"
+                      }
+                    >
+                      {item.state}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-[12px] text-faint">
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3 text-[12px] text-faint">
+                    {new Date(item.expiresAt).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {invitesQuery.data && invitesQuery.data.invites.length === 0 ? (
           <EmptyState
-            icon="✉"
+            icon={MailPlus}
             title="No invitations yet"
             hint="Invite a teammate to get started."
           />
         ) : null}
-      </div>
+      </Card>
 
-      <div className="panel" style={{ marginTop: 20 }}>
-        <h2 style={{ marginBottom: 8 }}>Already invited somewhere?</h2>
-        <p className="muted" style={{ marginTop: 0 }}>
+      <Card className="mt-5">
+        <h2 className="mb-1 text-[13.5px] font-bold text-ink">
+          Already invited somewhere?
+        </h2>
+        <p className="mb-3 text-[12.5px] text-muted">
           Paste an invite token to accept or decline it.
         </p>
-        <div className="row">
-          <Link className="btn" to="/accept-invite">
-            Open the accept screen
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/accept-invite">
+            <Button>Open the accept screen</Button>
           </Link>
-          <button
-            type="button"
-            className="btn btn--ghost"
+          <Button
+            variant="ghost"
+            icon={RefreshCw}
             onClick={() => void refreshWorkspaces()}
           >
             Refresh my workspaces
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

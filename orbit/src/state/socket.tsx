@@ -25,11 +25,7 @@ const SocketContext = createContext<SocketContextValue>({
 });
 
 export function SocketProvider({ children }: { children: ReactNode }) {
-  const { status, accessToken } = useAuth() as unknown as {
-    status: string;
-    accessToken?: string;
-    user?: unknown;
-  };
+  const { status, accessToken } = useAuth();
   const toast = useToast();
   const [socketState, setSocketState] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);

@@ -119,6 +119,9 @@ describe('HTTP regressions without database', () => {
     const filesRes = await request(app).get('/files/507f1f77bcf86cd799439011');
     expect(filesRes.status).toBe(401);
 
+    const filesListRes = await request(app).get('/files');
+    expect(filesListRes.status).toBe(401);
+
     const fromMessageRes = await request(app).post('/cards/from-message').send({
       messageId: '507f1f77bcf86cd799439011',
       boardId: '507f1f77bcf86cd799439012',

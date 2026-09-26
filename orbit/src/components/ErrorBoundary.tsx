@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { AlertTriangle } from "lucide-react";
+import { Button, ErrorBox } from "./ui";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -48,59 +50,47 @@ export class ErrorBoundary extends Component<
       }
 
       return (
-        <div
-          className="error-boundary-box"
-          role="alert"
-          style={{ padding: 24, margin: "16px auto", maxWidth: 640 }}
-        >
-          <div className="error-box">
-            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 600 }}>
-              Something went wrong{" "}
-              {this.props.name ? `in ${this.props.name}` : ""}
-            </h3>
-            <p style={{ margin: "0 0 12px", fontSize: 13.5, opacity: 0.9 }}>
-              {this.state.error.message ||
-                "An unexpected rendering error occurred."}
-            </p>
-            <div className="row" style={{ gap: 8, marginTop: 12 }}>
-              <button
-                type="button"
-                className="btn btn--sm"
-                onClick={this.reset}
-              >
+        <div role="alert" className="mx-auto my-6 max-w-[640px] px-4">
+          <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-danger-soft text-danger">
+                <AlertTriangle size={16} aria-hidden />
+              </span>
+              <h3 className="text-[15px] font-bold text-ink">
+                Something went wrong{" "}
+                {this.props.name ? `in ${this.props.name}` : ""}
+              </h3>
+            </div>
+            <ErrorBox
+              message={
+                this.state.error.message ||
+                "An unexpected rendering error occurred."
+              }
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={this.reset}>
                 Try again
-              </button>
-              <button
-                type="button"
-                className="btn btn--sm btn--ghost"
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
                 onClick={() => window.location.reload()}
               >
                 Reload page
-              </button>
-              <a href="/" className="btn btn--sm btn--ghost">
+              </Button>
+              <a
+                href="/"
+                className="text-[12.5px] font-semibold text-brand hover:underline"
+              >
                 Go to Dashboard
               </a>
             </div>
             {import.meta.env.DEV && this.state.error.stack ? (
-              <details
-                style={{
-                  marginTop: 12,
-                  fontSize: 11,
-                  fontFamily: "monospace",
-                  opacity: 0.8,
-                }}
-              >
-                <summary style={{ cursor: "pointer", marginBottom: 4 }}>
+              <details className="mt-4 font-mono text-[11px] text-muted">
+                <summary className="cursor-pointer">
                   View technical stack
                 </summary>
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                    maxHeight: 200,
-                    overflowY: "auto",
-                  }}
-                >
+                <pre className="mt-2 max-h-[200px] overflow-y-auto whitespace-pre-wrap">
                   {this.state.error.stack}
                 </pre>
               </details>

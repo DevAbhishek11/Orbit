@@ -1,7 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
+import {
+  CheckCircle2,
+  FileText,
+  Kanban,
+  MessageSquare,
+  Timer,
+  Users,
+} from "lucide-react";
 import { analyticsApi } from "../api/endpoints";
+import {
+  Badge,
+  Card,
+  CardHeader,
+  CenterState,
+  ErrorBox,
+  PageHeader,
+  ProgressBar,
+} from "../components/ui";
 import { useAuth } from "../state/auth";
-import { Badge, CenterState, ErrorBox, Spinner } from "../components/ui";
 
 export function AnalyticsPage() {
   const { workspaceId, workspace } = useAuth();
@@ -15,75 +31,43 @@ export function AnalyticsPage() {
   const kpis = overviewQuery.data?.kpis;
 
   return (
-    <div className="page dashboard" style={{ padding: "24px 32px" }}>
-      <div className="page__header">
-        <div className="page__header-text">
-          <span className="eyebrow">WORKSPACE INSIGHTS</span>
-          <h1>Analytics & Metrics</h1>
-          <p className="page__subtitle">
+    <div className="mx-auto w-full max-w-[1100px] px-5 py-6">
+      <PageHeader
+        title="Analytics & Metrics"
+        subtitle={
+          <>
             Live metrics, card completion rates and activity trends for{" "}
-            <strong>{workspace?.name}</strong>.
-          </p>
-        </div>
-      </div>
+            <strong className="text-ink">{workspace?.name}</strong>.
+          </>
+        }
+      />
 
-      {overviewQuery.isLoading && (
-        <CenterState>
-          <Spinner large />
-          <div>Aggregating metrics…</div>
-        </CenterState>
-      )}
+      {overviewQuery.isLoading ? (
+        <CenterState>Aggregating metrics…</CenterState>
+      ) : null}
 
-      {overviewQuery.isError && (
+      {overviewQuery.isError ? (
         <ErrorBox message="Could not load analytics. Please try again." />
-      )}
+      ) : null}
 
-      {kpis && (
-        <div className="stack" style={{ gap: 24 }}>
-          {}
-          <div
-            className="grid grid--three"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 16,
-            }}
-          >
-            <div className="panel" style={{ padding: 20 }}>
-              <span
-                className="faint"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                }}
-              >
-                Total Cards
-              </span>
-              <div style={{ fontSize: 32, fontWeight: 700, margin: "8px 0" }}>
-                {kpis.totalCards}
+      {kpis ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <StatCard
+              icon={Kanban}
+              label="Total Cards"
+              value={String(kpis.totalCards)}
+              hint={`${kpis.activeCards} active · ${kpis.completedCards} completed`}
+            />
+            <Card>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                  Completion Rate
+                </span>
+                <CheckCircle2 size={14} className="text-faint" aria-hidden />
               </div>
-              <div className="faint" style={{ fontSize: 12 }}>
-                {kpis.activeCards} active · {kpis.completedCards} completed
-              </div>
-            </div>
-
-            <div className="panel" style={{ padding: 20 }}>
-              <span
-                className="faint"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                }}
-              >
-                Completion Rate
-              </span>
-              <div
-                className="row"
-                style={{ gap: 8, alignItems: "baseline", margin: "8px 0" }}
-              >
-                <span style={{ fontSize: 32, fontWeight: 700 }}>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[28px] font-extrabold tracking-tight text-ink">
                   {kpis.completionRate}%
                 </span>
                 <Badge
@@ -98,150 +82,110 @@ export function AnalyticsPage() {
                   {kpis.completionRate >= 70 ? "On Track" : "In Progress"}
                 </Badge>
               </div>
-              <div className="progress" style={{ height: 6 }}>
-                <div
-                  className="progress__bar"
-                  style={{ width: `${kpis.completionRate}%` }}
+              <div className="mt-3">
+                <ProgressBar
+                  value={kpis.completionRate}
+                  tone={kpis.completionRate >= 70 ? "ok" : "warn"}
                 />
               </div>
-            </div>
-
-            <div className="panel" style={{ padding: 20 }}>
-              <span
-                className="faint"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                }}
-              >
-                Overdue Tasks
-              </span>
-              <div
-                style={{
-                  fontSize: 32,
-                  fontWeight: 700,
-                  margin: "8px 0",
-                  color: kpis.overdueCards > 0 ? "var(--danger)" : "inherit",
-                }}
-              >
-                {kpis.overdueCards}
-              </div>
-              <div className="faint" style={{ fontSize: 12 }}>
-                {kpis.overdueCards === 0
-                  ? "No overdue items 🎉"
-                  : "Needs attention"}
-              </div>
-            </div>
-
-            <div className="panel" style={{ padding: 20 }}>
-              <span
-                className="faint"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                }}
-              >
-                Knowledge Base
-              </span>
-              <div style={{ fontSize: 32, fontWeight: 700, margin: "8px 0" }}>
-                {kpis.pageCount}
-              </div>
-              <div className="faint" style={{ fontSize: 12 }}>
-                Nested documents & wikis
-              </div>
-            </div>
-
-            <div className="panel" style={{ padding: 20 }}>
-              <span
-                className="faint"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                }}
-              >
-                Communication
-              </span>
-              <div style={{ fontSize: 32, fontWeight: 700, margin: "8px 0" }}>
-                {kpis.messageCount}
-              </div>
-              <div className="faint" style={{ fontSize: 12 }}>
-                Across {kpis.channelCount} channel(s)
-              </div>
-            </div>
-
-            <div className="panel" style={{ padding: 20 }}>
-              <span
-                className="faint"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                }}
-              >
-                Active Members
-              </span>
-              <div style={{ fontSize: 32, fontWeight: 700, margin: "8px 0" }}>
-                {kpis.memberCount}
-              </div>
-              <div className="faint" style={{ fontSize: 12 }}>
-                Workspace collaborators
-              </div>
-            </div>
+            </Card>
+            <StatCard
+              icon={Timer}
+              label="Overdue Tasks"
+              value={String(kpis.overdueCards)}
+              hint={
+                kpis.overdueCards === 0 ? "No overdue items" : "Needs attention"
+              }
+              danger={kpis.overdueCards > 0}
+            />
+            <StatCard
+              icon={FileText}
+              label="Knowledge Base"
+              value={String(kpis.pageCount)}
+              hint="Nested documents & wikis"
+            />
+            <StatCard
+              icon={MessageSquare}
+              label="Communication"
+              value={String(kpis.messageCount)}
+              hint={`Across ${kpis.channelCount} channel(s)`}
+            />
+            <StatCard
+              icon={Users}
+              label="Active Members"
+              value={String(kpis.memberCount)}
+              hint="Workspace collaborators"
+            />
           </div>
 
-          {}
-          <div className="panel" style={{ padding: 24 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>
-              Workspace Pillar Health
-            </h3>
-            <div
-              className="grid grid--two"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 20,
-              }}
-            >
+          <Card>
+            <CardHeader title="Workspace Pillar Health" />
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
-                <div className="row row--between" style={{ marginBottom: 6 }}>
-                  <span>Kanban Execution</span>
-                  <strong>
+                <div className="mb-1.5 flex items-center justify-between text-[12px]">
+                  <span className="font-semibold text-muted">
+                    Kanban Execution
+                  </span>
+                  <strong className="text-ink">
                     {kpis.completedCards} / {kpis.totalCards} cards
                   </strong>
                 </div>
-                <div className="progress">
-                  <div
-                    className="progress__bar"
-                    style={{ width: `${kpis.completionRate}%` }}
-                  />
-                </div>
+                <ProgressBar value={kpis.completionRate} />
               </div>
               <div>
-                <div className="row row--between" style={{ marginBottom: 6 }}>
-                  <span>Collaboration Density</span>
-                  <strong>
+                <div className="mb-1.5 flex items-center justify-between text-[12px]">
+                  <span className="font-semibold text-muted">
+                    Collaboration Density
+                  </span>
+                  <strong className="text-ink">
                     {kpis.channelCount > 0
                       ? Math.round(kpis.messageCount / kpis.channelCount)
                       : 0}{" "}
                     msgs/channel
                   </strong>
                 </div>
-                <div className="progress">
-                  <div
-                    className="progress__bar"
-                    style={{
-                      width: `${Math.min(kpis.messageCount * 5, 100)}%`,
-                    }}
-                  />
-                </div>
+                <ProgressBar
+                  value={Math.min(kpis.messageCount * 5, 100)}
+                  tone="info"
+                />
               </div>
             </div>
-          </div>
+          </Card>
         </div>
-      )}
+      ) : null}
     </div>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  danger = false,
+}: {
+  icon: typeof Kanban;
+  label: string;
+  value: string;
+  hint: string;
+  danger?: boolean;
+}) {
+  return (
+    <Card className="flex items-start justify-between gap-3">
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-wider text-faint">
+          {label}
+        </div>
+        <div
+          className={`mt-1.5 text-[28px] font-extrabold tracking-tight ${danger ? "text-danger" : "text-ink"}`}
+        >
+          {value}
+        </div>
+        <div className="mt-1 text-[11.5px] text-faint">{hint}</div>
+      </div>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+        <Icon size={17} aria-hidden />
+      </span>
+    </Card>
   );
 }

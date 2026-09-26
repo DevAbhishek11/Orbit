@@ -133,6 +133,11 @@ async function startLocalMongoServer(): Promise<string> {
 export async function connectDatabase(): Promise<mongoose.Connection> {
   mongoose.set('strictQuery', true);
 
+  for (const model of Object.values(mongoose.models)) {
+    model.schema.set('toJSON', { virtuals: true, versionKey: false });
+    model.schema.set('toObject', { virtuals: true, versionKey: false });
+  }
+
   let targetUri = env.MONGODB_URI;
 
   try {

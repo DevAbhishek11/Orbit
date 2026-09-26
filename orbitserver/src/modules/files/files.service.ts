@@ -203,3 +203,7 @@ export async function listFilesByEntity(
 ): Promise<FileDoc[]> {
   return repo.findFilesByEntity(workspaceId, entityType, entityId);
 }
+
+export async function listFiles(workspaceId: string): Promise<FileDoc[]> {
+  return repo.findFilesByWorkspace(workspaceId);
+}
