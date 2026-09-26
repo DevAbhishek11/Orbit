@@ -94,7 +94,6 @@ export default function App() {
             <OfflineInit />
             <OfflineBanner />
             <Routes>
-              {}
               <Route path="/status" element={<StatusPage />} />
               <Route
                 path="/login"
@@ -118,7 +117,6 @@ export default function App() {
               <Route path="/invites/:token" element={<InvitePage />} />
               <Route path="/accept-invite" element={<InvitePage />} />
 
-              {}
               <Route
                 element={
                   <RequireAuth>

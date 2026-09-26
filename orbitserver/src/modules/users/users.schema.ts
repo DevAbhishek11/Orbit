@@ -24,7 +24,15 @@ export const updateProfileSchema = z
   .object({
     name: z.string().trim().min(1, 'Name is required').max(120).optional(),
     timezone: z.string().min(1).max(64).optional(),
-    avatarUrl: z.string().url().max(2048).nullable().optional(),
+    avatarUrl: z
+      .string()
+      .max(2048)
+      .refine(
+        (value) => /^https?:\/\/\S+$/i.test(value) || /^\/[\w\-./]*$/.test(value),
+        'Must be a valid URL or an app-relative path',
+      )
+      .nullable()
+      .optional(),
     preferences: preferencesSchema.optional(),
   })
   .strict()

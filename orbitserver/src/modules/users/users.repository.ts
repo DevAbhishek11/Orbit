@@ -102,9 +102,6 @@ export async function recordFailedLogin(
   lockAfter: number,
   lockMs: number,
 ): Promise<void> {
-  // Increment first, then lock if the threshold is reached. Avoids an
-  // aggregation-pipeline update, which some MongoDB-compatible engines
-  // (including the embedded dev engine) do not support.
   const updated = await UserModel.findOneAndUpdate(
     { _id: userId },
     { $inc: { failedLoginCount: 1 } },

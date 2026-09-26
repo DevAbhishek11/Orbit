@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
-import { LogOut, MonitorSmartphone } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
+import { KeyRound, LogOut, MonitorSmartphone, Upload, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiError } from "../api/client";
+import { ApiError, broadcastSession, setAccessToken } from "../api/client";
 import { authApi, usersApi } from "../api/endpoints";
 import {
   Avatar,
@@ -69,6 +69,12 @@ export function SettingsPage() {
     queryFn: () => authApi.sessions(),
   });
 
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
   const [name, setName] = useState(user?.name ?? "");
   const [timezone, setTimezone] = useState(user?.timezone ?? "UTC");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
@@ -97,6 +103,52 @@ export function SettingsPage() {
     },
     onError: (err: ApiError) =>
       toast.error("Could not save preferences", err.message),
+  });
+
+  const avatarUpload = useMutation({
+    mutationFn: (file: File) => usersApi.uploadAvatar(file),
+    onSuccess: (updated) => {
+      setUser(updated);
+      setAvatarUrl(updated.avatarUrl ?? "");
+      toast.success("Profile photo updated");
+    },
+    onError: (err: ApiError) => toast.error("Upload failed", err.message),
+  });
+
+  const avatarRemove = useMutation({
+    mutationFn: () => usersApi.removeAvatar(),
+    onSuccess: (updated) => {
+      setUser(updated);
+      setAvatarUrl("");
+      toast.info("Profile photo removed");
+    },
+    onError: (err: ApiError) =>
+      toast.error("Could not remove photo", err.message),
+  });
+
+  const changePassword = useMutation({
+    mutationFn: () => authApi.changePassword(currentPassword, newPassword),
+    onSuccess: (result) => {
+      setAccessToken(result.accessToken);
+      broadcastSession({
+        type: "token",
+        accessToken: result.accessToken,
+        at: Date.now(),
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordError(null);
+      void queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      toast.success(
+        "Password changed",
+        "All other devices have been signed out.",
+      );
+    },
+    onError: (err: ApiError) => {
+      setPasswordError(err.message);
+      toast.error("Could not change password", err.message);
+    },
   });
 
   const revoke = useMutation({
@@ -135,9 +187,11 @@ export function SettingsPage() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card>
-          <div className="mb-5 flex items-center gap-3.5">
-            <Avatar name={user.name} url={user.avatarUrl} size="lg" />
-            <div>
+          <div className="mb-5 flex flex-wrap items-center gap-3.5">
+            <div className="relative">
+              <Avatar name={user.name} url={user.avatarUrl} size="lg" />
+            </div>
+            <div className="min-w-0">
               <h2 className="text-[14.5px] font-bold text-ink">{user.name}</h2>
               <div className="text-[12px] text-faint">@{user.handle}</div>
               <div className="mt-1.5 flex items-center gap-2">
@@ -148,6 +202,41 @@ export function SettingsPage() {
                 )}
                 <span className="text-[11.5px] text-faint">
                   status: {user.status}
+                </span>
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) avatarUpload.mutate(file);
+                    event.target.value = "";
+                  }}
+                />
+                <Button
+                  size="xs"
+                  icon={Upload}
+                  loading={avatarUpload.isPending}
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  Upload photo
+                </Button>
+                {user.avatarUrl ? (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    icon={X}
+                    loading={avatarRemove.isPending}
+                    onClick={() => avatarRemove.mutate()}
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+                <span className="text-[11px] text-faint">
+                  PNG, JPEG, GIF or WebP · max 2 MB
                 </span>
               </div>
             </div>
@@ -261,6 +350,70 @@ export function SettingsPage() {
           </div>
         </Card>
       </div>
+
+      <Card className="mt-5">
+        <CardHeader
+          title="Password"
+          subtitle="Changing your password signs out every other device immediately."
+        />
+        {passwordError ? <ErrorBox message={passwordError} /> : null}
+        <form
+          className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+          onSubmit={(event: FormEvent) => {
+            event.preventDefault();
+            setPasswordError(null);
+            if (newPassword.length < 12) {
+              setPasswordError("New password must be at least 12 characters.");
+              return;
+            }
+            if (newPassword !== confirmPassword) {
+              setPasswordError("New password and confirmation do not match.");
+              return;
+            }
+            changePassword.mutate();
+          }}
+        >
+          <Field label="Current password">
+            <Input
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              required
+            />
+          </Field>
+          <Field label="New password" hint="At least 12 characters.">
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              required
+              minLength={12}
+            />
+          </Field>
+          <Field label="Confirm new password">
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              required
+            />
+          </Field>
+          <div className="sm:col-span-3">
+            <Button
+              type="submit"
+              variant="primary"
+              icon={KeyRound}
+              loading={changePassword.isPending}
+              disabled={!currentPassword || !newPassword || !confirmPassword}
+            >
+              Change password
+            </Button>
+          </div>
+        </form>
+      </Card>
 
       <Card className="mt-5">
         <CardHeader

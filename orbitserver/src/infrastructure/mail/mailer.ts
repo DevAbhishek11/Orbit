@@ -21,7 +21,7 @@ function getTransporter(): Transporter | null {
     transporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
-      secure: env.SMTP_SECURE, // true for 465, false for 587/2525 (STARTTLS upgrade)
+      secure: env.SMTP_SECURE,
       auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
     });
     log.info(
@@ -113,7 +113,6 @@ export async function sendMail(payload: MailPayload): Promise<void> {
     });
     log.info({ to: payload.to, template: payload.template }, 'email sent via SMTP');
   } catch (err) {
-    // Never fail the caller's request because mail is down; surface it loudly instead.
     log.error({ err, to: payload.to, template: payload.template }, 'failed to send email via SMTP');
   }
 }

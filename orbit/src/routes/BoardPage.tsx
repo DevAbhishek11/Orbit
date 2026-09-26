@@ -297,8 +297,8 @@ export function BoardPage() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-56px)] flex-col">
-        <div className="flex shrink-0 flex-wrap items-center gap-2.5 border-b border-line bg-surface px-4 py-2.5">
+      <div className="flex h-[calc(100dvh-56px)] flex-col">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5 border-b border-line bg-surface px-3 py-2.5 sm:px-4">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -327,7 +327,7 @@ export function BoardPage() {
         </div>
 
         <div
-          className="min-h-0 flex-1 overflow-auto bg-app p-4"
+          className="min-h-0 flex-1 overflow-auto bg-app p-3 sm:p-4"
           onDragOver={(event) => event.preventDefault()}
           onDrop={handleDrop}
         >
@@ -335,7 +335,7 @@ export function BoardPage() {
             {view.lists.map((list) => (
               <section
                 key={list.id}
-                className="flex max-h-full w-[272px] shrink-0 flex-col rounded-xl border border-line bg-surface/80 shadow-sm"
+                className="flex max-h-full w-[85vw] max-w-[272px] shrink-0 flex-col rounded-xl border border-line bg-surface/80 shadow-sm sm:w-[272px]"
                 onDragOver={(event) => {
                   if (!dragListId) return;
                   event.preventDefault();
@@ -527,7 +527,7 @@ export function BoardPage() {
             ))}
 
             {!readOnly ? (
-              <section className="w-[272px] shrink-0">
+              <section className="w-[85vw] max-w-[272px] shrink-0 sm:w-[272px]">
                 {addingList ? (
                   <form
                     className="flex items-center gap-2 rounded-xl border border-line bg-surface p-2.5 shadow-sm"

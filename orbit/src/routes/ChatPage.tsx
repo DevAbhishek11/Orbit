@@ -25,6 +25,8 @@ import {
   Input,
   Modal,
   Select,
+  SubSidebar,
+  SubSidebarToggle,
 } from "../components/ui";
 import { useAuth } from "../state/auth";
 import { useSocket } from "../state/socket";
@@ -43,8 +45,6 @@ function ChannelGlyph({ type, size = 14 }: { type: string; size?: number }) {
 export function ChatPage() {
   const { workspaceId, user, role } = useAuth();
   const { channelId: rawChannelId } = useParams();
-  // Ignore malformed params (e.g. a stale "/chat/undefined" URL) so queries
-  // stay disabled and the redirect effect picks the first channel instead.
   const channelId = useMemo(
     () =>
       rawChannelId && OBJECT_ID.test(rawChannelId) ? rawChannelId : undefined,
@@ -54,6 +54,7 @@ export function ChatPage() {
   const toast = useToast();
   const navigate = useNavigate();
 
+  const [channelListOpen, setChannelListOpen] = useState(false);
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelTopic, setNewChannelTopic] = useState("");
@@ -237,8 +238,12 @@ export function ChatPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-56px)]">
-      <aside className="flex w-[248px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface/60 p-3">
+    <div className="flex h-[calc(90dvh-56px)] md:h-[calc(92.25dvh-56px)] min-h-0">
+      <SubSidebar
+        open={channelListOpen}
+        onClose={() => setChannelListOpen(false)}
+        width="w-[248px]"
+      >
         <div className="mb-2 flex items-center justify-between px-1.5">
           <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">
             Channels
@@ -266,7 +271,10 @@ export function ChatPage() {
               <button
                 key={channel.id}
                 type="button"
-                onClick={() => navigate(`/chat/${channel.id}`)}
+                onClick={() => {
+                  navigate(`/chat/${channel.id}`);
+                  setChannelListOpen(false);
+                }}
                 className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors ${
                   isSelected
                     ? "bg-brand-soft font-bold text-brand"
@@ -287,12 +295,16 @@ export function ChatPage() {
             <p className="px-2 py-3 text-[12px] text-faint">No channels yet.</p>
           ) : null}
         </nav>
-      </aside>
+      </SubSidebar>
 
       <main className="flex min-w-0 flex-1 flex-col">
         {activeChannel ? (
-          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-5 py-3">
-            <div className="min-w-0">
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-3 py-3 sm:px-5">
+            <SubSidebarToggle
+              onClick={() => setChannelListOpen(true)}
+              label="Show channels"
+            />
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-brand">
                   <ChannelGlyph type={activeChannel.type} size={15} />
@@ -309,7 +321,15 @@ export function ChatPage() {
               ) : null}
             </div>
           </header>
-        ) : null}
+        ) : (
+          <header className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-3 sm:px-5">
+            <SubSidebarToggle
+              onClick={() => setChannelListOpen(true)}
+              label="Show channels"
+            />
+            <strong className="text-[13.5px] text-ink">Chat</strong>
+          </header>
+        )}
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {messagesQuery.isLoading ? (
@@ -606,7 +626,7 @@ function ThreadPanel({
   const replies = threadQuery.data?.replies ?? [];
 
   return (
-    <aside className="flex w-[320px] shrink-0 flex-col border-l border-line bg-surface animate-slide-left">
+    <aside className="fixed inset-0 z-40 flex w-full shrink-0 flex-col border-l border-line bg-surface animate-slide-left md:static md:z-auto md:w-[320px]">
       <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
         <strong className="text-[13px] text-ink">Thread</strong>
         <Button

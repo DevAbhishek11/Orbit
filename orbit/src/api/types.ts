@@ -362,3 +362,14 @@ export interface BoardBurndown {
     priority: Priority;
   }>;
 }
+
+export interface WorkspaceFile {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  status: string;
+  s3Key: string;
+  uploadedBy: string;
+  createdAt: string;
+}

@@ -6,6 +6,7 @@ import { typedBody, typedCookie } from '../../infrastructure/http/input.js';
 import { invalidateAuthSnapshot, requireAuth } from '../../middleware/authenticate.js';
 import * as authService from './auth.service.js';
 import type {
+  ChangePasswordInput,
   ForgotPasswordInput,
   LoginInput,
   LogoutInput,
@@ -105,6 +106,24 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   await authService.resetPassword(typedBody<ResetPasswordInput>(req), { ip: req.ip });
   clearRefreshCookie(res);
   ok(res, { reset: true });
+}
+
+export async function changePassword(req: Request, res: Response): Promise<void> {
+  const auth = requireAuth(req);
+  await authService.changePassword(
+    auth.userId,
+    typedBody<ChangePasswordInput>(req),
+    requestContext(req),
+  );
+  await invalidateAuthSnapshot(auth.userId);
+
+  const result = await authService.issueSessionFor(auth.userId, {
+    ...requestContext(req),
+    remember: false,
+    workspaceId: auth.workspaceId,
+  });
+  setRefreshCookie(res, result.tokens.refreshToken, result.tokens.refreshExpiresAt);
+  ok(res, shapeAuthResult(result));
 }
 
 export async function verifyEmail(req: Request, res: Response): Promise<void> {

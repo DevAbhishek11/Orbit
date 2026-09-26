@@ -34,6 +34,7 @@ import {
   verifyAccessToken,
 } from './tokens.service.js';
 import type {
+  ChangePasswordInput,
   ForgotPasswordInput,
   LoginInput,
   RegisterInput,
@@ -290,7 +291,7 @@ export async function refresh(
       accessToken: access.token,
       accessExpiresIn: access.expiresInSeconds,
       refreshToken: rotated.rawToken,
-      refreshExpiresAt: rotated.record.expiresAt,
+      refreshExpiresAt: rotated.expiresAt,
     },
     workspaceId: scope.workspaceId ?? null,
     role: scope.role ?? null,
@@ -393,6 +394,66 @@ export async function resetPassword(
     ip: context.ip,
   });
   authEventsTotal.inc({ event: 'password_reset' });
+}
+
+export async function changePassword(
+  userId: string,
+  input: ChangePasswordInput,
+  context: RequestContext & { keepCurrentSessionToken?: string },
+): Promise<void> {
+  const user = await findUserById(userId, { withPassword: true });
+  if (!user) throw unauthenticated('Account not found');
+
+  const valid = user.passwordHash
+    ? await verifyPassword(user.passwordHash, input.currentPassword)
+    : false;
+  if (!valid) {
+    authEventsTotal.inc({ event: 'password_change_fail' });
+    throw new ApiError('VALIDATION_ERROR', 'Current password is incorrect', {
+      status: 400,
+      details: { issues: [{ path: 'currentPassword', message: 'Current password is incorrect' }] },
+    });
+  }
+
+  if (input.currentPassword === input.newPassword) {
+    throw new ApiError('VALIDATION_ERROR', 'New password must be different', {
+      status: 422,
+      details: {
+        issues: [{ path: 'newPassword', message: 'New password must differ from the current one' }],
+      },
+    });
+  }
+
+  const policy = checkPasswordPolicy(input.newPassword, { email: user.email, name: user.name });
+  if (!policy.ok) {
+    throw new ApiError('VALIDATION_ERROR', 'Password does not meet the policy', {
+      status: 422,
+      details: { issues: policy.reasons.map((message) => ({ path: 'newPassword', message })) },
+    });
+  }
+
+  await updatePasswordHash(userId, await hashPassword(input.newPassword));
+  await revokeAllUserTokens(userId, 'password_changed');
+
+  await recordAudit({
+    actorId: userId,
+    action: 'auth.password_changed',
+    entityType: 'user',
+    entityId: userId,
+    ip: context.ip,
+    userAgent: context.userAgent,
+  });
+  authEventsTotal.inc({ event: 'password_change' });
+}
+
+export async function issueSessionFor(
+  userId: string,
+  context: RequestContext & { remember?: boolean; workspaceId?: string },
+): Promise<AuthResult> {
+  const user = await findUserById(userId);
+  if (!user) throw unauthenticated('Account not found');
+  const bundle = await buildTokenBundle(user, context);
+  return { user: toPublicUser(user), ...bundle };
 }
 
 export async function verifyEmail(token: string): Promise<{ email: string }> {

@@ -130,8 +130,40 @@ export async function issueRefreshToken(input: {
 }
 
 export type RotateResult =
-  | { ok: true; rawToken: string; record: IRefreshToken; familyId: string }
+  | { ok: true; rawToken: string; record: IRefreshToken; familyId: string; expiresAt: Date }
   | { ok: false; reason: 'not_found' | 'expired' | 'revoked' | 'reused' };
+
+export const REFRESH_ROTATION_GRACE_MS = 60_000;
+
+function withinGrace(record: Pick<IRefreshToken, 'rotatedAt' | 'expiresAt'>): boolean {
+  if (!record.rotatedAt) return false;
+  return (
+    Date.now() - record.rotatedAt.getTime() <= REFRESH_ROTATION_GRACE_MS &&
+    record.expiresAt.getTime() > Date.now()
+  );
+}
+
+async function issueSiblingToken(record: IRefreshToken): Promise<RotateResult> {
+  log.debug(
+    { userId: record.userId, familyId: record.familyId },
+    'concurrent refresh within grace window — issuing sibling token',
+  );
+  const sibling = await issueRefreshToken({
+    userId: record.userId,
+    familyId: record.familyId,
+    remember: isRememberRecord(record),
+    device: record.device,
+    userAgent: record.userAgent,
+    ip: record.ip,
+  });
+  return {
+    ok: true,
+    rawToken: sibling.rawToken,
+    record,
+    familyId: record.familyId,
+    expiresAt: sibling.expiresAt,
+  };
+}
 
 export async function rotateRefreshToken(rawToken: string): Promise<RotateResult> {
   const tokenHash = hashRefreshToken(rawToken);
@@ -140,6 +172,9 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
   if (!record) return { ok: false, reason: 'not_found' };
   if (record.revokedAt) {
     return { ok: false, reason: 'revoked' };
+  }
+  if (record.rotatedAt && withinGrace(record)) {
+    return issueSiblingToken(record.toObject());
   }
   if (record.rotatedAt) {
     log.error(
@@ -154,8 +189,7 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
     return { ok: false, reason: 'expired' };
   }
 
-  const remember =
-    record.expiresAt.getTime() - record.createdAt.getTime() > env.REFRESH_TOKEN_TTL * 1000 + 60_000;
+  const remember = isRememberRecord(record);
   const issued = await issueRefreshToken({
     userId: record.userId,
     familyId: record.familyId,
@@ -180,7 +214,10 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
   if (!rotated) {
     await RefreshTokenModel.deleteOne({ tokenHash: hashRefreshToken(issued.rawToken) }).exec();
     const current = await RefreshTokenModel.findOne({ tokenHash }).exec();
-    if (current?.rotatedAt) return { ok: false, reason: 'reused' };
+    if (current?.rotatedAt) {
+      if (withinGrace(current)) return issueSiblingToken(current.toObject());
+      return { ok: false, reason: 'reused' };
+    }
     return { ok: false, reason: 'revoked' };
   }
 
@@ -189,7 +226,13 @@ export async function rotateRefreshToken(rawToken: string): Promise<RotateResult
     rawToken: issued.rawToken,
     record: rotated.toObject(),
     familyId: record.familyId,
+    expiresAt: issued.expiresAt,
   };
+}
+
+export function isRememberRecord(record: Pick<IRefreshToken, 'expiresAt' | 'createdAt'>): boolean {
+  const createdAt = record.createdAt ? record.createdAt.getTime() : Date.now();
+  return record.expiresAt.getTime() - createdAt > env.REFRESH_TOKEN_TTL * 1000 + 60_000;
 }
 
 export async function revokeFamily(

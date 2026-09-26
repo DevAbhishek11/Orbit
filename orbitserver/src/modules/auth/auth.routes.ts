@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validate.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import * as controller from './auth.controller.js';
 import {
+  changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
   logoutSchema,
@@ -62,6 +63,14 @@ authRouter.post(
   ipRateLimit,
   validate({ body: resetPasswordSchema }),
   controller.resetPassword,
+);
+
+authRouter.post(
+  '/change-password',
+  authenticate(),
+  authRateLimit,
+  validate({ body: changePasswordSchema }),
+  controller.changePassword,
 );
 
 authRouter.post(

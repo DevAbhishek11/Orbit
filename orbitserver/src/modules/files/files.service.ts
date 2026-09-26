@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { notFound, validationFailed } from '../../infrastructure/errors/ApiError.js';
 import { enqueue } from '../../infrastructure/queues/index.js';
 import { emitSafe } from '../../infrastructure/events/eventBus.js';
+import { CardModel } from '../cards/cards.model.js';
 import * as repo from './files.repository.js';
 import type { FileDoc } from './files.model.js';
 import type { PresignInput } from './files.schema.js';
@@ -110,6 +111,8 @@ export async function saveLocalFileStream(
     });
   }
 
+  await adjustAttachmentCount(updated, 1);
+
   emitSafe(`workspace:${workspaceId}`, 'file:ready', {
     fileId: updated._id.toString(),
     fileName: updated.originalName,
@@ -158,6 +161,8 @@ export async function confirmUpload(
     });
   }
 
+  await adjustAttachmentCount(updated, 1);
+
   emitSafe(`workspace:${workspaceId}`, 'file:ready', {
     fileId: updated._id.toString(),
     fileName: updated.originalName,
@@ -165,6 +170,13 @@ export async function confirmUpload(
   });
 
   return updated;
+}
+
+async function adjustAttachmentCount(file: FileDoc, delta: number): Promise<void> {
+  if (file.entityType !== 'card' || !file.entityId) return;
+  await CardModel.updateOne({ _id: file.entityId }, { $inc: { attachmentCount: delta } })
+    .exec()
+    .catch(() => undefined);
 }
 
 export async function getFile(fileId: string, workspaceId: string): Promise<FileDoc> {
@@ -178,6 +190,7 @@ export async function deleteFile(fileId: string, workspaceId: string): Promise<v
   if (!file) throw notFound('File');
 
   await repo.deleteFileById(fileId);
+  if (file.status !== 'deleted') await adjustAttachmentCount(file, -1);
 
   try {
     const targetDir = path.join(LOCAL_STORAGE_DIR, workspaceId);

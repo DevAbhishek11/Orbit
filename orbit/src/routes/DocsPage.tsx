@@ -24,6 +24,8 @@ import {
   Input,
   Modal,
   Select,
+  SubSidebar,
+  SubSidebarToggle,
   Textarea,
 } from "../components/ui";
 import { useAuth } from "../state/auth";
@@ -36,6 +38,7 @@ export function DocsPage() {
   const navigate = useNavigate();
   const { success: toastSuccess, error: toastError } = useToast();
 
+  const [docListOpen, setDocListOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [newPageTitle, setNewPageTitle] = useState("");
   const [parentForNewPage, setParentForNewPage] = useState<string | null>(null);
@@ -82,8 +85,12 @@ export function DocsPage() {
   });
 
   return (
-    <div className="flex h-[calc(100vh-56px)]">
-      <aside className="flex w-[264px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface/60 p-3">
+    <div className="flex h-[calc(90dvh-56px)] md:h-[calc(92.25dvh-56px)] min-h-0">
+      <SubSidebar
+        open={docListOpen}
+        onClose={() => setDocListOpen(false)}
+        width="w-[264px]"
+      >
         <div className="mb-2 flex items-center justify-between px-1.5">
           <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">
             Docs & Wiki
@@ -117,7 +124,10 @@ export function DocsPage() {
               >
                 <button
                   type="button"
-                  onClick={() => navigate(`/docs/${page.id}`)}
+                  onClick={() => {
+                    navigate(`/docs/${page.id}`);
+                    setDocListOpen(false);
+                  }}
                   className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] transition-colors ${
                     isSelected
                       ? "bg-brand-soft font-bold text-brand"
@@ -150,9 +160,15 @@ export function DocsPage() {
             </p>
           ) : null}
         </nav>
-      </aside>
+      </SubSidebar>
 
-      <main className="min-w-0 flex-1 overflow-y-auto px-6 py-8 lg:px-12">
+      <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-12">
+        <div className="mb-3 md:hidden">
+          <SubSidebarToggle
+            onClick={() => setDocListOpen(true)}
+            label="Show docs"
+          />
+        </div>
         {pageQuery.isLoading ? <CenterState>Loading doc…</CenterState> : null}
 
         {pageQuery.isError ? (
@@ -465,7 +481,10 @@ function DocEditor({
 
       <div className="space-y-2.5">
         {blocks.map((block, index) => (
-          <div key={block.id || index} className="group flex items-start gap-2">
+          <div
+            key={block.id || index}
+            className="group flex flex-col items-stretch gap-2 sm:flex-row sm:items-start"
+          >
             {!readOnly ? (
               <Select
                 value={block.type}
@@ -475,7 +494,7 @@ function DocEditor({
                     event.target.value as PageBlock["type"],
                   )
                 }
-                className="w-[104px] shrink-0 pt-0.5"
+                className="w-full shrink-0 pt-0.5 sm:w-[104px]"
                 aria-label="Block type"
               >
                 <option value="paragraph">Text</option>
@@ -553,7 +572,7 @@ function DocEditor({
                   onBlur={handleSave}
                   placeholder="Type something…"
                   rows={2}
-                  className="border-transparent bg-transparent focus:border-brand"
+                  className="border bg-transparent focus:border-brand"
                 />
               )}
             </div>

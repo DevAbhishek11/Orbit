@@ -1,4 +1,4 @@
-import Dexie, { type Table } from 'dexie';
+import Dexie, { type Table } from "dexie";
 
 export interface OutboxItem {
   id?: number;
@@ -21,21 +21,26 @@ class OrbitDB extends Dexie {
   cache!: Table<CacheEntry, string>;
 
   constructor() {
-    super('orbit-offline');
+    super("orbit-offline");
     this.version(1).stores({
-      outbox: '++id, url, createdAt',
-      cache: 'key, updatedAt',
+      outbox: "++id, url, createdAt",
+      cache: "key, updatedAt",
     });
   }
 }
 
 export const offlineDb = new OrbitDB();
 
-export async function enqueueOutbox(item: Omit<OutboxItem, 'id' | 'createdAt' | 'retries'>) {
+export async function enqueueOutbox(
+  item: Omit<OutboxItem, "id" | "createdAt" | "retries">,
+) {
   await offlineDb.outbox.add({ ...item, createdAt: Date.now(), retries: 0 });
 }
 
-export async function flushOutbox(): Promise<{ flushed: number; failed: number }> {
+export async function flushOutbox(): Promise<{
+  flushed: number;
+  failed: number;
+}> {
   const items = await offlineDb.outbox.toArray();
   let flushed = 0;
   let failed = 0;
@@ -52,7 +57,9 @@ export async function flushOutbox(): Promise<{ flushed: number; failed: number }
     } catch {
       failed++;
       if (item.id != null) {
-        await offlineDb.outbox.update(item.id, { retries: (item.retries ?? 0) + 1 });
+        await offlineDb.outbox.update(item.id, {
+          retries: (item.retries ?? 0) + 1,
+        });
       }
     }
   }

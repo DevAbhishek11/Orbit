@@ -406,7 +406,7 @@ function Sidebar({
         mobileOpen ? "translate-x-0" : "-translate-x-full"
       } ${collapsed ? "lg:w-[68px]" : "lg:w-[248px]"}`}
     >
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-line px-3.5">
+      <div className="flex h-14 shrink-0 items-center justify-between px-3.5">
         <div className="flex items-center gap-2.5 overflow-hidden">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-sm">
             <Kanban size={16} aria-hidden />
@@ -431,7 +431,7 @@ function Sidebar({
                 ? "Expand sidebar (Ctrl+B)"
                 : "Collapse sidebar (Ctrl+B)"
             }
-            className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-md text-sidebar-ink hover:bg-white/10 hover:text-sidebar-strong lg:flex"
+            className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-md text-sidebar-ink hover:bg-sidebar-hover hover:text-sidebar-strong lg:flex"
           >
             {collapsed ? (
               <PanelLeftOpen size={15} />
@@ -444,7 +444,7 @@ function Sidebar({
         <button
           type="button"
           onClick={onCloseMobile}
-          className="cursor-pointer rounded-md p-1.5 text-sidebar-ink hover:bg-white/10 lg:hidden"
+          className="cursor-pointer rounded-md p-1.5 text-sidebar-ink hover:bg-sidebar-hover lg:hidden"
           aria-label="Close navigation"
         >
           <X size={16} />
@@ -452,7 +452,7 @@ function Sidebar({
       </div>
 
       {!collapsed ? (
-        <div className="mx-3 mt-3 flex items-center gap-2.5 rounded-lg border border-sidebar-line bg-white/5 px-2.5 py-2">
+        <div className="mx-3 mt-3 flex items-center gap-2.5 rounded-lg border border-sidebar-line bg-sidebar-raised px-2.5 py-2">
           <Avatar name={user?.name ?? "Orbit User"} url={user?.avatarUrl} />
           <span className="min-w-0 leading-tight">
             <span className="block truncate text-[12.5px] font-bold text-sidebar-strong">
@@ -472,7 +472,7 @@ function Sidebar({
             <button
               type="button"
               title="Switch workspace"
-              className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border border-sidebar-line bg-white/5 px-2.5 py-2 text-left transition-colors hover:bg-white/10 ${collapsed ? "justify-center" : ""}`}
+              className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border border-sidebar-line bg-sidebar-raised px-2.5 py-2 text-left transition-colors hover:bg-sidebar-hover ${collapsed ? "justify-center" : ""}`}
             >
               <Building2
                 size={14}
@@ -553,7 +553,7 @@ function Sidebar({
                       } ${
                         isActive
                           ? "bg-brand/15 text-brand shadow-[inset_2px_0_0_0_var(--brand)]"
-                          : "text-sidebar-ink hover:bg-white/5 hover:text-sidebar-strong"
+                          : "text-sidebar-ink hover:bg-sidebar-hover hover:text-sidebar-strong"
                       }`
                     }
                   >
@@ -576,7 +576,7 @@ function Sidebar({
           title={
             collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"
           }
-          className="hidden h-7 w-full cursor-pointer items-center justify-center text-sidebar-ink hover:bg-white/10 hover:text-sidebar-strong lg:flex border-t border-sidebar-line py-5"
+          className="hidden h-7 w-full cursor-pointer items-center justify-center text-sidebar-ink hover:bg-sidebar-hover hover:text-sidebar-strong lg:flex border-t border-sidebar-line py-5"
         >
           {collapsed ? (
             <PanelLeftOpen size={15} />
@@ -585,7 +585,7 @@ function Sidebar({
           )}
         </button>
       ) : null}
-      <div className="shrink-0 border-t border-sidebar-line px-3 py-2.5">
+      <div className="shrink-0 px-3 py-2.5">
         <div
           className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2`}
         >
@@ -603,7 +603,7 @@ function Sidebar({
               type="button"
               onClick={onExport}
               title="Export personal data"
-              className="cursor-pointer rounded-md p-1.5 text-sidebar-ink hover:bg-white/10 hover:text-sidebar-strong"
+              className="cursor-pointer rounded-md p-1.5 text-sidebar-ink hover:bg-sidebar-hover hover:text-sidebar-strong"
             >
               <Download size={14} />
             </button>
@@ -611,7 +611,7 @@ function Sidebar({
               type="button"
               onClick={onSignOut}
               title="Sign out"
-              className="cursor-pointer rounded-md p-1.5 text-sidebar-ink hover:bg-white/10 hover:text-sidebar-strong"
+              className="cursor-pointer rounded-md p-1.5 text-sidebar-ink hover:bg-sidebar-hover hover:text-sidebar-strong"
             >
               <LogOut size={14} />
             </button>

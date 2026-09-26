@@ -25,6 +25,49 @@ export class ApiError extends Error {
 
 let accessToken: string | null = null;
 
+const SESSION_CHANNEL = "orbit.session";
+type SessionMessage =
+  | { type: "token"; accessToken: string; at: number }
+  | { type: "signed-out"; at: number }
+  | { type: "signed-in"; at: number };
+
+const sessionChannel: BroadcastChannel | null =
+  typeof BroadcastChannel === "undefined"
+    ? null
+    : new BroadcastChannel(SESSION_CHANNEL);
+
+let onForeignToken: ((token: string) => void) | null = null;
+let onForeignSignOut: (() => void) | null = null;
+let onForeignSignIn: (() => void) | null = null;
+
+sessionChannel?.addEventListener("message", (event: MessageEvent) => {
+  const message = event.data as SessionMessage | null;
+  if (!message) return;
+  if (message.type === "token") {
+    accessToken = message.accessToken;
+    onForeignToken?.(message.accessToken);
+  } else if (message.type === "signed-out") {
+    accessToken = null;
+    onForeignSignOut?.();
+  } else if (message.type === "signed-in") {
+    onForeignSignIn?.();
+  }
+});
+
+export function setCrossTabHooks(hooks: {
+  onToken?: (token: string) => void;
+  onSignOut?: () => void;
+  onSignIn?: () => void;
+}): void {
+  onForeignToken = hooks.onToken ?? null;
+  onForeignSignOut = hooks.onSignOut ?? null;
+  onForeignSignIn = hooks.onSignIn ?? null;
+}
+
+export function broadcastSession(message: SessionMessage): void {
+  sessionChannel?.postMessage(message);
+}
+
 export function getAccessToken(): string | null {
   return accessToken;
 }
@@ -74,9 +117,81 @@ export function setSessionHooks(hooks: {
   onSessionLost = hooks.onLost;
 }
 
+const REFRESH_LOCK_KEY = "orbit.refreshLock";
+const REFRESH_LOCK_TTL_MS = 8_000;
+
+function acquireRefreshLock(): boolean {
+  try {
+    const raw = localStorage.getItem(REFRESH_LOCK_KEY);
+    const now = Date.now();
+    if (raw) {
+      const held = Number(raw);
+      if (Number.isFinite(held) && now - held < REFRESH_LOCK_TTL_MS)
+        return false;
+    }
+    localStorage.setItem(REFRESH_LOCK_KEY, String(now));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function releaseRefreshLock(): void {
+  try {
+    localStorage.removeItem(REFRESH_LOCK_KEY);
+  } catch {
+    void 0;
+  }
+}
+
+function waitForForeignToken(
+  timeoutMs = REFRESH_LOCK_TTL_MS,
+): Promise<string | null> {
+  if (!sessionChannel) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      sessionChannel.removeEventListener("message", listener);
+      resolve(null);
+    }, timeoutMs);
+    const listener = (event: MessageEvent) => {
+      const message = event.data as SessionMessage | null;
+      if (message?.type === "token") {
+        clearTimeout(timer);
+        sessionChannel.removeEventListener("message", listener);
+        resolve(message.accessToken);
+      }
+      if (message?.type === "signed-out") {
+        clearTimeout(timer);
+        sessionChannel.removeEventListener("message", listener);
+        resolve(null);
+      }
+    };
+    sessionChannel.addEventListener("message", listener);
+  });
+}
+
 export function refreshSession(): Promise<AuthShape | null> {
   if (!refreshInFlight) {
-    refreshInFlight = request<AuthShape>("/auth/refresh", {
+    refreshInFlight = runRefresh().finally(() => {
+      queueMicrotask(() => {
+        refreshInFlight = null;
+      });
+    });
+  }
+  return refreshInFlight;
+}
+
+async function runRefresh(): Promise<AuthShape | null> {
+  if (!acquireRefreshLock()) {
+    const token = await waitForForeignToken();
+    if (token) {
+      setAccessToken(token);
+      return null;
+    }
+  }
+
+  try {
+    return await request<AuthShape>("/auth/refresh", {
       method: "POST",
       noRetry: true,
       body: {
@@ -85,21 +200,23 @@ export function refreshSession(): Promise<AuthShape | null> {
     })
       .then((auth) => {
         setAccessToken(auth.accessToken);
+        broadcastSession({
+          type: "token",
+          accessToken: auth.accessToken,
+          at: Date.now(),
+        });
         onSessionRefreshed?.(auth);
         return auth;
       })
       .catch(() => {
         setAccessToken(null);
+        broadcastSession({ type: "signed-out", at: Date.now() });
         onSessionLost?.();
         return null;
-      })
-      .finally(() => {
-        queueMicrotask(() => {
-          refreshInFlight = null;
-        });
       });
+  } finally {
+    releaseRefreshLock();
   }
-  return refreshInFlight;
 }
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
@@ -241,4 +358,67 @@ export function idempotencyKey(prefix: string): string {
     "",
   );
   return `${prefix}_${Date.now().toString(36)}${hex}`;
+}
+
+export async function requestBinary<T>(
+  path: string,
+  body: Blob,
+  contentType: string,
+): Promise<T> {
+  const attempt = async (): Promise<T> => {
+    const headers: Record<string, string> = {
+      accept: "application/json",
+      "content-type": contentType,
+    };
+    if (accessToken) headers.authorization = `Bearer ${accessToken}`;
+    const response = await fetch(buildUrl(path), {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body,
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      success: boolean;
+      data?: T;
+      error?: { code: string; message: string; details?: unknown };
+    } | null;
+    if (response.ok && payload?.success) return payload.data as T;
+    throw new ApiError(
+      payload?.error?.code ?? "INTERNAL_ERROR",
+      payload?.error?.message ?? `Upload failed with status ${response.status}`,
+      response.status,
+      payload?.error?.details,
+    );
+  };
+
+  try {
+    return await attempt();
+  } catch (err) {
+    if (!(err instanceof ApiError) || err.status !== 401) throw err;
+    const auth = await refreshSession();
+    if (!auth) throw err;
+    return attempt();
+  }
+}
+
+export async function fetchBlob(path: string): Promise<Blob> {
+  const attempt = async (): Promise<Response> =>
+    fetch(buildUrl(path), {
+      headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
+      credentials: "include",
+    });
+
+  let response = await attempt();
+  if (response.status === 401) {
+    const auth = await refreshSession();
+    if (auth) response = await attempt();
+  }
+  if (!response.ok) {
+    throw new ApiError(
+      "INTERNAL_ERROR",
+      `Could not load file (${response.status})`,
+      response.status,
+    );
+  }
+  return response.blob();
 }

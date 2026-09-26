@@ -27,7 +27,12 @@ export async function presign(req: Request, res: Response): Promise<void> {
 
 export async function listFiles(req: Request, res: Response): Promise<void> {
   const auth = requireAuth(req);
-  const files = await service.listFiles(auth.workspaceId!);
+  const entityType = typeof req.query.entityType === 'string' ? req.query.entityType : undefined;
+  const entityId = typeof req.query.entityId === 'string' ? req.query.entityId : undefined;
+  const files =
+    entityType && entityId
+      ? await service.listFilesByEntity(auth.workspaceId!, entityType, entityId)
+      : await service.listFiles(auth.workspaceId!);
   ok(res, {
     files: files.map((file) => ({
       id: file._id.toString(),
@@ -37,6 +42,8 @@ export async function listFiles(req: Request, res: Response): Promise<void> {
       status: file.status,
       s3Key: file.s3Key,
       uploadedBy: file.uploadedBy,
+      entityType: file.entityType ?? null,
+      entityId: file.entityId ?? null,
       createdAt: file.createdAt,
     })),
   });
@@ -105,10 +112,11 @@ export async function downloadFile(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const inline = req.query.disposition === 'inline';
   res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
   res.setHeader(
     'Content-Disposition',
-    `attachment; filename="${encodeURIComponent(file.originalName)}"`,
+    `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(file.originalName)}"`,
   );
   const stream = fs.createReadStream(filePath);
   stream.pipe(res);

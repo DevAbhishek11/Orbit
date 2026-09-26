@@ -20,13 +20,12 @@ import {
   Inbox,
   Loader2,
   MessageSquare,
+  PanelLeft,
   Search,
   Sparkles,
   X,
   type LucideIcon,
 } from "lucide-react";
-
-/* ---------------------------------- icons --------------------------------- */
 
 const NAMED_ICONS: Record<string, LucideIcon> = {
   sparkles: Sparkles,
@@ -53,8 +52,6 @@ export function AppIcon({
   const Icon = (name && NAMED_ICONS[name]) || FileText;
   return <Icon size={size} className={className} aria-hidden />;
 }
-
-/* --------------------------------- button --------------------------------- */
 
 export type ButtonVariant = "primary" | "outline" | "ghost" | "soft" | "danger";
 export type ButtonSize = "md" | "sm" | "xs" | "icon" | "icon-sm";
@@ -113,8 +110,6 @@ export function Button({
     </button>
   );
 }
-
-/* ---------------------------------- inputs -------------------------------- */
 
 export const inputClass =
   "w-full h-9 rounded-md border border-line-strong/60 bg-surface px-3 text-[13px] text-ink placeholder:text-faint transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25 disabled:opacity-60 disabled:cursor-not-allowed";
@@ -226,8 +221,6 @@ export function Field({
   );
 }
 
-/* ------------------------------ segmented/tabs ----------------------------- */
-
 export function Segmented<T extends string>({
   options,
   value,
@@ -271,8 +264,6 @@ export function Segmented<T extends string>({
   );
 }
 
-/* ---------------------------------- badge --------------------------------- */
-
 export type BadgeTone =
   "default" | "brand" | "info" | "success" | "warning" | "danger";
 
@@ -302,8 +293,6 @@ export function Badge({
     </span>
   );
 }
-
-/* ---------------------------------- card ---------------------------------- */
 
 export function Card({
   children,
@@ -346,8 +335,6 @@ export function CardHeader({
     </div>
   );
 }
-
-/* --------------------------------- spinner -------------------------------- */
 
 export function Spinner({ large = false }: { large?: boolean }) {
   return (
@@ -418,8 +405,6 @@ export function ErrorBox({
   );
 }
 
-/* ---------------------------------- avatar -------------------------------- */
-
 const AVATAR_HUES = [
   "bg-orange-500",
   "bg-sky-500",
@@ -473,8 +458,6 @@ export function Avatar({
   );
 }
 
-/* ---------------------------------- modal --------------------------------- */
-
 export function Modal({
   title,
   onClose,
@@ -505,7 +488,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-overlay p-4 pt-[12vh] animate-fade-in"
+      className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-overlay p-3 pt-[6vh] animate-fade-in sm:p-4 sm:pt-[12vh]"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
@@ -602,8 +585,6 @@ export function ConfirmDialog({
   );
 }
 
-/* ------------------------------ menu / popover ----------------------------- */
-
 export interface MenuItem {
   id: string;
   label: ReactNode;
@@ -696,8 +677,6 @@ export function Menu({
   );
 }
 
-/* ------------------------------- progress bar ------------------------------ */
-
 export function ProgressBar({
   value,
   tone = "brand",
@@ -724,8 +703,6 @@ export function ProgressBar({
     </div>
   );
 }
-
-/* ---------------------------------- misc ---------------------------------- */
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
@@ -791,5 +768,57 @@ export function CheckItem({
       <Check size={13} aria-hidden />
       {children}
     </span>
+  );
+}
+
+export function SubSidebar({
+  open,
+  onClose,
+  width = "w-[264px]",
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  width?: string;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {open ? (
+        <button
+          type="button"
+          aria-label="Close panel"
+          className="fixed inset-0 z-30 bg-overlay md:hidden"
+          onClick={onClose}
+        />
+      ) : null}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex ${width} max-w-[85vw] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface p-3 transition-transform duration-200 md:static md:z-auto md:max-w-none md:translate-x-0 md:bg-surface/60 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {children}
+      </aside>
+    </>
+  );
+}
+
+export function SubSidebarToggle({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="cursor-pointer rounded-md border border-line p-1.5 text-muted transition-colors hover:bg-sunken hover:text-ink md:hidden"
+    >
+      <PanelLeft size={16} aria-hidden />
+    </button>
   );
 }

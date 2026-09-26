@@ -1,4 +1,9 @@
-import { idempotencyKey, request, requestWithMeta } from "./client";
+import {
+  idempotencyKey,
+  request,
+  requestBinary,
+  requestWithMeta,
+} from "./client";
 import type {
   Activity,
   AuthResult,
@@ -15,6 +20,7 @@ import type {
   Visibility,
   Workspace,
   WorkspaceDetail,
+  WorkspaceFile,
 } from "./types";
 
 export interface HealthReport {
@@ -113,6 +119,12 @@ export const authApi = {
   revokeSession: (familyId: string) =>
     request<void>(`/auth/sessions/${familyId}`, { method: "DELETE" }),
 
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<AuthResult>("/auth/change-password", {
+      method: "POST",
+      body: { currentPassword, newPassword },
+    }),
+
   me: () =>
     request<{ userId: string; workspaceId: string | null; role: Role | null }>(
       "/auth/me",
@@ -136,6 +148,9 @@ export const usersApi = {
   me: () => request<User>("/users/me"),
   updateMe: (body: UpdateProfileBody) =>
     request<User>("/users/me", { method: "PATCH", body }),
+  uploadAvatar: (file: File) =>
+    requestBinary<User>("/users/me/avatar", file, file.type || "image/png"),
+  removeAvatar: () => request<User>("/users/me/avatar", { method: "DELETE" }),
 };
 
 export interface CreatedWorkspace {
@@ -676,4 +691,6 @@ export const filesApi = {
 
   remove: (fileId: string) =>
     request<void>(`/files/${fileId}`, { method: "DELETE" }),
+
+  list: () => request<{ files: WorkspaceFile[] }>("/files"),
 };

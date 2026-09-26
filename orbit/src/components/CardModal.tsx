@@ -1,9 +1,19 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Plus, X } from "lucide-react";
-import { ApiError } from "../api/client";
+import {
+  Archive,
+  ArchiveRestore,
+  Download,
+  Paperclip,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
+import { ApiError, getAccessToken, request } from "../api/client";
 import { cardsApi, workspacesApi } from "../api/endpoints";
-import type { Card, Checklist } from "../api/types";
+import type { Card, Checklist, WorkspaceFile } from "../api/types";
+import { FilePreview, FileThumbnail } from "./FilePreview";
+import { isPreviewable } from "../lib/filePreview";
 import { useAuth } from "../state/auth";
 import { useToast } from "../state/toast";
 import {
@@ -475,6 +485,8 @@ export function CardModal({
               </div>
             </div>
 
+            <CardAttachments cardId={cardId} readOnly={readOnly} />
+
             <div>
               <SectionTitle>
                 Comments ({commentsQuery.data?.comments.length ?? 0})
@@ -703,5 +715,225 @@ function AddItemForm({
         Add
       </Button>
     </form>
+  );
+}
+
+function CardAttachments({
+  cardId,
+  readOnly,
+}: {
+  cardId: string;
+  readOnly: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [openFile, setOpenFile] = useState<WorkspaceFile | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkspaceFile | null>(null);
+
+  const attachmentsQuery = useQuery({
+    queryKey: ["card-attachments", cardId],
+    queryFn: async () => {
+      const res = await request<{ files: WorkspaceFile[] }>("/files", {
+        query: { entityType: "card", entityId: cardId },
+      });
+      return res.files ?? [];
+    },
+  });
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({
+      queryKey: ["card-attachments", cardId],
+    });
+    void queryClient.invalidateQueries({ queryKey: ["card", cardId] });
+  };
+
+  const upload = useMutation({
+    mutationFn: async (file: File) => {
+      const presigned = await request<{
+        file: { id: string };
+        uploadUrl: string;
+      }>("/files/presign", {
+        method: "POST",
+        body: {
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          size: file.size,
+          entityType: "card",
+          entityId: cardId,
+        },
+      });
+      const token = getAccessToken();
+      const res = await fetch(`/api/v1/files/${presigned.file.id}/raw`, {
+        method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
+      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+    },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Attachment uploaded");
+    },
+    onError: (err: Error) => toast.error("Upload failed", err.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (fileId: string) =>
+      request<void>(`/files/${fileId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      invalidate();
+      setDeleteTarget(null);
+      setOpenFile(null);
+      toast.info("Attachment deleted");
+    },
+    onError: (err: Error) => toast.error("Delete failed", err.message),
+  });
+
+  const download = async (file: WorkspaceFile) => {
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/v1/files/${file.id}/download`, {
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const url = URL.createObjectURL(await res.blob());
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = file.fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Could not download attachment");
+    }
+  };
+
+  const files = attachmentsQuery.data ?? [];
+
+  return (
+    <div>
+      <SectionTitle>Attachments ({files.length})</SectionTitle>
+
+      {attachmentsQuery.isLoading ? (
+        <p className="text-[12.5px] text-faint">Loading attachments…</p>
+      ) : files.length === 0 ? (
+        <p className="text-[12.5px] text-faint">
+          No attachments yet. Images, PDFs and text files preview inline.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {files.map((file) => (
+            <div
+              key={file.id}
+              className="rounded-lg border border-line bg-surface p-2.5"
+            >
+              <div className="flex items-center gap-2.5">
+                <FileThumbnail file={file} className="h-8 w-8" />
+                <button
+                  type="button"
+                  onClick={() => setOpenFile(file)}
+                  className="min-w-0 flex-1 cursor-pointer truncate text-left text-[12px] font-semibold text-ink hover:text-brand"
+                >
+                  {file.fileName}
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Download ${file.fileName}`}
+                  onClick={() => void download(file)}
+                >
+                  <Download size={13} />
+                </Button>
+                {!readOnly ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Delete ${file.fileName}`}
+                    onClick={() => setDeleteTarget(file)}
+                  >
+                    <Trash2 size={13} />
+                  </Button>
+                ) : null}
+              </div>
+              {isPreviewable(file.mimeType) ? (
+                <button
+                  type="button"
+                  className="mt-2 block w-full cursor-pointer"
+                  onClick={() => setOpenFile(file)}
+                >
+                  <FilePreview file={file} height="h-28" compact />
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!readOnly ? (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) upload.mutate(file);
+              event.target.value = "";
+            }}
+          />
+          <Button
+            size="xs"
+            icon={Paperclip}
+            className="mt-2.5"
+            loading={upload.isPending}
+            onClick={() => inputRef.current?.click()}
+          >
+            Attach file
+          </Button>
+        </>
+      ) : null}
+
+      {openFile ? (
+        <Modal
+          title={openFile.fileName}
+          onClose={() => setOpenFile(null)}
+          size="md"
+          footer={
+            <Button
+              variant="primary"
+              icon={Download}
+              onClick={() => void download(openFile)}
+            >
+              Download
+            </Button>
+          }
+        >
+          <FilePreview file={openFile} height="h-[60vh]" />
+        </Modal>
+      ) : null}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title={`Delete ${deleteTarget.fileName}?`}
+          body={
+            <div className="space-y-3">
+              <FilePreview file={deleteTarget} height="h-44" compact />
+              <p className="text-[12.5px] text-muted">
+                The attachment is removed from this card and deleted from
+                storage.
+              </p>
+            </div>
+          }
+          confirmLabel="Delete attachment"
+          danger
+          busy={remove.isPending}
+          onConfirm={() => remove.mutate(deleteTarget.id)}
+          onClose={() => setDeleteTarget(null)}
+        />
+      ) : null}
+    </div>
   );
 }

@@ -148,17 +148,56 @@ interface BoardCardRaw {
   [key: string]: unknown;
 }
 
+type Profile = { id: string; name: string; handle: string; avatarUrl: string | null };
+
+export function serializeBoardCard(
+  card: BoardCardRaw,
+  profiles: Map<string, Profile> = new Map(),
+): Record<string, unknown> {
+  const checklists = Array.isArray(card.checklists)
+    ? (card.checklists as { items?: { done?: boolean }[] }[])
+    : [];
+  const progress = card.checklistProgress as { done?: number; total?: number } | undefined;
+  const assignees = Array.isArray(card.assignees) ? card.assignees : [];
+
+  return {
+    ...card,
+    id: String(card._id),
+    listId: card.listId ?? '',
+    title: typeof card.title === 'string' ? card.title : '',
+    description: card.description ?? null,
+    labels: Array.isArray(card.labels) ? card.labels : [],
+    checklists,
+    assignees,
+    watchers: Array.isArray(card.watchers) ? card.watchers : [],
+    priority: card.priority ?? 'none',
+    dueAt: card.dueAt ?? null,
+    startAt: card.startAt ?? null,
+    completedAt: card.completedAt ?? null,
+    commentCount: typeof card.commentCount === 'number' ? card.commentCount : 0,
+    attachmentCount: typeof card.attachmentCount === 'number' ? card.attachmentCount : 0,
+    checklistProgress: {
+      done:
+        progress?.done ??
+        checklists.reduce((sum, c) => sum + (c.items ?? []).filter((i) => i.done).length, 0),
+      total: progress?.total ?? checklists.reduce((sum, c) => sum + (c.items ?? []).length, 0),
+    },
+    version: typeof card.version === 'number' ? card.version : 0,
+    assigneeProfiles: assignees
+      .map((a) => profiles.get(a) ?? null)
+      .filter((p): p is Profile => Boolean(p)),
+  };
+}
+
 async function buildBoardView(board: BoardDoc): Promise<Record<string, unknown>> {
-  // Two portable queries instead of a $lookup pipeline: list ids are ObjectIds
-  // while cards store `listId` as a string, and the ObjectId→string coercion
-  // inside aggregation pipelines is not available on every engine.
-  const lists = await ListModel.find({
+  const lists = (await ListModel.find({
     boardId: String(board._id),
     archivedAt: null,
     deletedAt: null,
   })
     .sort({ order: 1 })
-    .exec();
+    .lean()
+    .exec()) as ListDoc[];
 
   const listIds = lists.map((list) => String(list._id));
   const cardsByList = new Map<string, BoardCardRaw[]>();
@@ -170,6 +209,7 @@ async function buildBoardView(board: BoardDoc): Promise<Record<string, unknown>>
     })
       .sort({ order: 1 })
       .limit(2000)
+      .lean()
       .exec()) as unknown as BoardCardRaw[];
     for (const card of cards) {
       const bucket = cardsByList.get(card.listId ?? '');
@@ -205,14 +245,8 @@ async function buildBoardView(board: BoardDoc): Promise<Record<string, unknown>>
       order: list.order,
       color: list.color ?? null,
       wipLimit: list.wipLimit ?? null,
-      cardCount: list.cardCount,
-      cards: cards.map((card) => ({
-        ...card,
-        id: String(card._id),
-        assigneeProfiles: (card.assignees ?? [])
-          .map((a) => profiles.get(a) ?? null)
-          .filter(Boolean),
-      })),
+      cardCount: typeof list.cardCount === 'number' ? list.cardCount : cards.length,
+      cards: cards.map((card) => serializeBoardCard(card, profiles)),
     })),
   };
 }

@@ -1,20 +1,18 @@
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Download,
-  File as FileIcon,
-  FileArchive,
-  FileText,
-  FolderOpen,
-  Image as ImageIcon,
-  Trash2,
-  UploadCloud,
-} from "lucide-react";
+import { Download, FolderOpen, Trash2, UploadCloud } from "lucide-react";
 import { getAccessToken, request } from "../api/client";
+import {
+  FileGlyph,
+  FilePreview,
+  FileThumbnail,
+} from "../components/FilePreview";
+import { fileIconFor, isPreviewable } from "../lib/filePreview";
 import {
   Badge,
   Button,
   CenterState,
+  ConfirmDialog,
   EmptyState,
   Modal,
   PageHeader,
@@ -44,13 +42,7 @@ function formatSize(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-function fileIcon(mimeType: string) {
-  if (mimeType.startsWith("image/")) return ImageIcon;
-  if (mimeType.includes("zip") || mimeType.includes("compressed"))
-    return FileArchive;
-  if (mimeType.includes("pdf") || mimeType.includes("text")) return FileText;
-  return FileIcon;
-}
+const fileIcon = fileIconFor;
 
 export function FilesPage() {
   const { workspaceId, role } = useAuth();
@@ -58,6 +50,7 @@ export function FilesPage() {
   const queryClient = useQueryClient();
 
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
   const [dragActive, setDragActive] = useState(false);
@@ -133,6 +126,7 @@ export function FilesPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["files", workspaceId] });
       setPreviewFile(null);
+      setDeleteTarget(null);
       toast.info("File deleted");
     },
     onError: (err) => {
@@ -283,7 +277,7 @@ export function FilesPage() {
           value={search}
           onChange={setSearch}
           placeholder="Filter files by name…"
-          className="w-[240px]"
+          className="w-full sm:w-[240px]"
         />
         <Segmented<FilterType>
           value={filterType}
@@ -314,7 +308,6 @@ export function FilesPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((file) => {
-            const Icon = fileIcon(file.mimeType);
             return (
               <button
                 key={file.id}
@@ -323,13 +316,22 @@ export function FilesPage() {
                 className="cursor-pointer rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-md"
               >
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
-                    <Icon size={16} aria-hidden />
-                  </span>
+                  {isPreviewable(file.mimeType) ? (
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                      <FileGlyph mimeType={file.mimeType} />
+                    </span>
+                  ) : (
+                    <FileThumbnail file={file} />
+                  )}
                   <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-ink">
                     {file.fileName}
                   </span>
                 </div>
+                {isPreviewable(file.mimeType) ? (
+                  <div className="mt-3">
+                    <FilePreview file={file} height="h-32" compact />
+                  </div>
+                ) : null}
                 <div className="mt-3 flex items-center justify-between text-[11px] text-faint">
                   <span>{formatSize(file.size)}</span>
                   <Badge tone={file.status === "ready" ? "success" : "warning"}>
@@ -361,8 +363,7 @@ export function FilesPage() {
                 <Button
                   variant="danger"
                   icon={Trash2}
-                  loading={deleteMutation.isPending}
-                  onClick={() => deleteMutation.mutate(previewFile.id)}
+                  onClick={() => setDeleteTarget(previewFile)}
                 >
                   Delete
                 </Button>
@@ -377,6 +378,9 @@ export function FilesPage() {
             </>
           }
         >
+          <div className="mb-4">
+            <FilePreview file={previewFile} height="h-72" />
+          </div>
           <dl className="space-y-2 text-[12.5px]">
             <div className="flex justify-between gap-3">
               <dt className="text-faint">MIME type</dt>
@@ -408,6 +412,26 @@ export function FilesPage() {
             </div>
           </dl>
         </Modal>
+      ) : null}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title={`Delete ${deleteTarget.fileName}?`}
+          body={
+            <div className="space-y-3">
+              <FilePreview file={deleteTarget} height="h-48" compact />
+              <p className="text-[12.5px] text-muted">
+                This removes the file from the workspace and deletes its stored
+                contents. This action cannot be undone.
+              </p>
+            </div>
+          }
+          confirmLabel="Delete file"
+          danger
+          busy={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+          onClose={() => setDeleteTarget(null)}
+        />
       ) : null}
 
       {dragActive ? (

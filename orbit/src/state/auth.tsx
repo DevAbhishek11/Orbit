@@ -9,11 +9,37 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ApiError, setAccessToken, setSessionHooks } from "../api/client";
+import {
+  ApiError,
+  broadcastSession,
+  setAccessToken,
+  setCrossTabHooks,
+  setSessionHooks,
+} from "../api/client";
 import { authApi, usersApi, workspacesApi } from "../api/endpoints";
 import type { Role, User, Workspace } from "../api/types";
 
 const WORKSPACE_KEY = "orbit.workspaceId";
+const REMEMBER_KEY = "orbit.rememberMe";
+const LAST_EMAIL_KEY = "orbit.lastEmail";
+
+export function getRememberedEmail(): string {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) === "true"
+      ? (localStorage.getItem(LAST_EMAIL_KEY) ?? "")
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+export function isRememberMeEnabled(): boolean {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 type Status = "loading" | "anonymous" | "authenticated";
 
@@ -82,6 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setRole(next.role ?? null);
       setStatus("authenticated");
+      broadcastSession({
+        type: "token",
+        accessToken: next.accessToken,
+        at: Date.now(),
+      });
+      broadcastSession({ type: "signed-in", at: Date.now() });
     },
     [],
   );
@@ -97,6 +129,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(WORKSPACE_KEY);
     setStatus("anonymous");
   }, [queryClient]);
+
+  useEffect(() => {
+    setCrossTabHooks({
+      onToken: (token) => {
+        setAccessTokenState(token);
+        setStatus((current) =>
+          current === "loading" ? current : "authenticated",
+        );
+      },
+      onSignOut: () => {
+        setAccessTokenState(null);
+        setUser(null);
+        setStatus((current) =>
+          current === "authenticated" ? "anonymous" : current,
+        );
+      },
+      onSignIn: () => {
+        if (!booted.current) return;
+        void (async () => {
+          try {
+            const me = await usersApi.me();
+            setUser(me);
+            await loadWorkspaces();
+            setStatus("authenticated");
+          } catch {
+            void 0;
+          }
+        })();
+      },
+    });
+    return () => setCrossTabHooks({});
+  }, [loadWorkspaces]);
 
   useEffect(() => {
     setSessionHooks({
@@ -168,6 +232,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     async (email: string, password: string, remember: boolean) => {
       const result = await authApi.login({ email, password, remember });
+      try {
+        localStorage.setItem(REMEMBER_KEY, String(remember));
+        if (remember) localStorage.setItem(LAST_EMAIL_KEY, email);
+        else localStorage.removeItem(LAST_EMAIL_KEY);
+      } catch {
+        void 0;
+      }
       await applyAuth(result);
       await loadWorkspaces();
     },
@@ -194,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await authApi.logout(allDevices);
       } finally {
         clearSession();
+        broadcastSession({ type: "signed-out", at: Date.now() });
       }
     },
     [clearSession],

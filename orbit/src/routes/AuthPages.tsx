@@ -19,7 +19,11 @@ import {
 import { ApiError } from "../api/client";
 import { authApi, invitesApi } from "../api/endpoints";
 import { Button, CheckItem, ErrorBox, Field, Input } from "../components/ui";
-import { useAuth } from "../state/auth";
+import {
+  getRememberedEmail,
+  isRememberMeEnabled,
+  useAuth,
+} from "../state/auth";
 import { useToast } from "../state/toast";
 
 function describeError(err: unknown, fallback: string): string {
@@ -319,9 +323,9 @@ export function RegisterPage() {
 export function LoginPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => getRememberedEmail());
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(() => isRememberMeEnabled());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -353,7 +357,7 @@ export function LoginPage() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
-            autoFocus
+            autoFocus={!email}
           />
         </Field>
         <PasswordField value={password} onChange={setPassword} />

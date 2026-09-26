@@ -59,6 +59,11 @@ export const resetPasswordSchema = z.object({
   password: passwordSchema,
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required').max(256),
+  newPassword: passwordSchema,
+});
+
 export const verifyEmailSchema = z.object({
   token: z.string().min(20).max(200),
 });
@@ -73,4 +78,5 @@ export type RefreshInput = z.infer<typeof refreshSchema>;
 export type LogoutInput = z.infer<typeof logoutSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;

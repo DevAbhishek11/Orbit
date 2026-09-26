@@ -161,7 +161,6 @@ export function BoardsPage() {
 
   return (
     <div className="mx-auto w-full">
-      {/* Hero */}
       <section className="relative mb-6 overflow-hidden rounded-2xl border border-line bg-sidebar px-6 py-6 text-sidebar-strong">
         <div
           className="pointer-events-none absolute -right-24 -top-32 h-72 w-72 rounded-full bg-brand/25 blur-3xl"
@@ -205,7 +204,6 @@ export function BoardsPage() {
         </div>
       </section>
 
-      {/* Period filter */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <span className="flex items-center gap-1.5 text-[12px] font-semibold text-muted">
           <Calendar size={13} aria-hidden /> Period:
@@ -228,7 +226,6 @@ export function BoardsPage() {
         </div>
       </div>
 
-      {/* Primary KPIs */}
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Total Projects"
@@ -264,7 +261,6 @@ export function BoardsPage() {
         />
       </div>
 
-      {/* Secondary KPIs */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         <MetricCard
           label="Completed Tasks"
@@ -304,7 +300,6 @@ export function BoardsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
-        {/* Main column */}
         <div className="min-w-0 space-y-5">
           <Card>
             <CardHeader
@@ -403,7 +398,7 @@ export function BoardsPage() {
                   <Select
                     value={sort}
                     onChange={(event) => setSort(event.target.value)}
-                    className="w-[120px]"
+                    className="w-full sm:w-[120px]"
                     aria-label="Sort boards"
                   >
                     <option value="recent">Recent</option>
@@ -414,7 +409,7 @@ export function BoardsPage() {
                     value={search}
                     onChange={setSearch}
                     placeholder="Search boards…"
-                    className="w-[180px]"
+                    className="w-full sm:w-[180px]"
                   />
                   <Segmented
                     size="sm"
@@ -571,7 +566,6 @@ export function BoardsPage() {
           </Card>
         </div>
 
-        {/* Side column */}
         <div className="space-y-5">
           <Card>
             <CardHeader

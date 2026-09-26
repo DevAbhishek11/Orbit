@@ -33,10 +33,14 @@
   --danger: #d43d3d;
   --danger-soft: rgba(212, 61, 61, 0.1);
 
-  --sidebar: #10162a;
-  --sidebar-line: rgba(255, 255, 255, 0.08);
-  --sidebar-ink: #b6bdd2;
-  --sidebar-ink-strong: #f2f4fb;
+  /* Light theme: the sidebar follows the surface palette like the header and
+     footer, instead of staying permanently dark. */
+  --sidebar: #ffffff;
+  --sidebar-line: #e3e6ee;
+  --sidebar-ink: #5c6577;
+  --sidebar-ink-strong: #16192a;
+  --sidebar-hover: rgba(22, 25, 42, 0.06);
+  --sidebar-raised: #f4f5f9;
 
   --shadow-sm: 0 1px 2px rgba(16, 22, 42, 0.07);
   --shadow: 0 8px 24px rgba(16, 22, 42, 0.12);
@@ -70,10 +74,12 @@
   --danger: #ff6b6b;
   --danger-soft: rgba(255, 107, 107, 0.16);
 
-  --sidebar: #0d1220;
-  --sidebar-line: rgba(255, 255, 255, 0.07);
-  --sidebar-ink: #8f99b3;
-  --sidebar-ink-strong: #eef1fa;
+  --sidebar: #131826;
+  --sidebar-line: #232b3f;
+  --sidebar-ink: #9aa4bb;
+  --sidebar-ink-strong: #e8ecf6;
+  --sidebar-hover: rgba(255, 255, 255, 0.07);
+  --sidebar-raised: rgba(255, 255, 255, 0.04);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -114,6 +120,8 @@
   --color-sidebar-line: var(--sidebar-line);
   --color-sidebar-ink: var(--sidebar-ink);
   --color-sidebar-strong: var(--sidebar-ink-strong);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-raised: var(--sidebar-raised);
 
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow);
