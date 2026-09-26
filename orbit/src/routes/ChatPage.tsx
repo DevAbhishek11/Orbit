@@ -30,7 +30,9 @@ import { useAuth } from "../state/auth";
 import { useSocket } from "../state/socket";
 import { useToast } from "../state/toast";
 
-const EMOJI_OPTIONS = ["👍", "❤️", "🚀", "👀", "", "🔥"];
+const EMOJI_OPTIONS = ["👍", "❤️", "🚀", "👀", "🎉", "🔥"];
+
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
 function ChannelGlyph({ type, size = 14 }: { type: string; size?: number }) {
   if (type === "dm") return <User size={size} aria-hidden />;
@@ -40,7 +42,14 @@ function ChannelGlyph({ type, size = 14 }: { type: string; size?: number }) {
 
 export function ChatPage() {
   const { workspaceId, user, role } = useAuth();
-  const { channelId } = useParams();
+  const { channelId: rawChannelId } = useParams();
+  // Ignore malformed params (e.g. a stale "/chat/undefined" URL) so queries
+  // stay disabled and the redirect effect picks the first channel instead.
+  const channelId = useMemo(
+    () =>
+      rawChannelId && OBJECT_ID.test(rawChannelId) ? rawChannelId : undefined,
+    [rawChannelId],
+  );
   const queryClient = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();

@@ -81,7 +81,10 @@ const schema = z.object({
 
   MAIL_FROM: z.string().default('Orbit <no-reply@orbit.dev>'),
   SMTP_HOST: z.string().optional().default(''),
-  SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional().default(1025),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional().default(587),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  SMTP_SECURE: booleanish.default('false'),
 
   METRICS_ENABLED: booleanish.default('true'),
   METRICS_TOKEN: z.string().default('internal-scrape-token'),

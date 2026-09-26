@@ -166,3 +166,26 @@ found while smoke-testing every feature against a live API.
   channels, chat send, board view, analytics overview, search, members,
   notifications, workspace create, file presign → raw upload → list (status
   `ready`), health ready — all green.
+
+## 2026-09-26 (2) — Full-stack E2E audit, SMTP mail, login-corruption fix
+
+Strict end-to-end testing of every module through the frontend proxy
+(login, workspaces, members, invites + accept, boards, lists, cards incl.
+versioned patch/move, pages incl. blocks, chat incl. threads/reactions/read,
+files presign→raw→list→download→delete, notifications, search, analytics,
+health).
+
+- Fixed a data-corruption bug: `recordFailedLogin` used an aggregation-pipeline
+  update that the embedded dev engine stores verbatim, wiping the user document
+  after any wrong-password attempt (login then failed permanently). Replaced
+  with a portable `$inc` + conditional lock update.
+- Real SMTP email via nodemailer (`SMTP_HOST/PORT/USER/PASS/SECURE`,
+  `MAIL_FROM`): verification, password-reset and workspace-invite templates
+  render as multipart text+HTML. Verified by sending through a local SMTP sink.
+  With `SMTP_HOST` empty, dev keeps the log-only stub.
+- ChatPage: reject malformed `/chat/:channelId` params (non-ObjectId, e.g.
+  stale "undefined" URLs) so the query stays disabled and the page redirects
+  to the first channel instead of calling `/channels/undefined/messages`.
+- Theme audit: all 29 color tokens have light+dark values; every color utility
+  used in the app resolves to a design token (card cover swatches are
+  intentional fixed data colors).
