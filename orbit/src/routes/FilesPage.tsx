@@ -212,7 +212,7 @@ export function FilesPage() {
 
   return (
     <div
-      className="mx-auto w-full max-w-[1200px] px-5 py-6"
+      className="mx-auto w-full"
       onDrop={onDrop}
       onDragOver={(event) => event.preventDefault()}
       onDragEnter={onDragEnter}

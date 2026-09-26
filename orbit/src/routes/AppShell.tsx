@@ -183,7 +183,7 @@ export function AppShell() {
     .filter((section) => section.items.length > 0);
 
   return (
-    <div className="flex min-h-screen bg-app text-ink">
+    <div className="flex h-screen overflow-hidden bg-surface text-ink">
       {mobileOpen ? (
         <div
           className="fixed inset-0 z-40 bg-overlay lg:hidden"
@@ -204,7 +204,7 @@ export function AppShell() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
+        <header className="z-30 flex h-14 shrink-0 items-center gap-3 bg-surface/90 px-4 backdrop-blur">
           <button
             type="button"
             className="cursor-pointer rounded-md p-1.5 text-muted hover:bg-sunken hover:text-ink lg:hidden"
@@ -217,13 +217,15 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
-            className="flex h-9 w-full max-w-md cursor-pointer items-center gap-2.5 rounded-lg border border-line bg-sunken/70 px-3 text-[12.5px] text-faint transition-colors hover:border-line-strong hover:text-muted"
+            className="flex h-9 md:w-full max-w-md cursor-pointer items-center gap-2.5 rounded-lg border border-line bg-sunken/70 px-3 text-[12.5px] text-faint transition-colors hover:border-line-strong hover:text-muted"
           >
             <Search size={14} aria-hidden />
-            <span className="flex-1 truncate text-left">
+            <span className="hidden md:block md:flex-1 truncate text-left">
               Search anything in {workspace?.name ?? "workspace"}…
             </span>
-            <Kbd>⌘K</Kbd>
+            <span className="hidden sm:block text-[11px] text-faint">
+              <Kbd>⌘ + K</Kbd>
+            </span>
           </button>
 
           <div className="ml-auto flex items-center gap-2">
@@ -316,11 +318,11 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1 overflow-y-auto p-4 border rounded-xl border-line bg-app mx-1">
           <Outlet />
         </main>
 
-        <footer className="border-t border-line bg-surface px-5 py-3">
+        <footer className="shrink-0 bg-surface px-5 py-[14px]">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-faint">
             <span>
               © {new Date().getFullYear()} Orbit Technologies. Built for
@@ -420,20 +422,25 @@ function Sidebar({
             </span>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          title={
-            collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"
-          }
-          className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-md text-sidebar-ink hover:bg-white/10 hover:text-sidebar-strong lg:flex"
-        >
-          {collapsed ? (
-            <PanelLeftOpen size={15} />
-          ) : (
-            <PanelLeftClose size={15} />
-          )}
-        </button>
+        {collapsed ? null : (
+          <button
+            type="button"
+            onClick={onToggle}
+            title={
+              collapsed
+                ? "Expand sidebar (Ctrl+B)"
+                : "Collapse sidebar (Ctrl+B)"
+            }
+            className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-md text-sidebar-ink hover:bg-white/10 hover:text-sidebar-strong lg:flex"
+          >
+            {collapsed ? (
+              <PanelLeftOpen size={15} />
+            ) : (
+              <PanelLeftClose size={15} />
+            )}
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onCloseMobile}
@@ -562,6 +569,22 @@ function Sidebar({
         ))}
       </nav>
 
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          title={
+            collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"
+          }
+          className="hidden h-7 w-full cursor-pointer items-center justify-center text-sidebar-ink hover:bg-white/10 hover:text-sidebar-strong lg:flex border-t border-sidebar-line py-5"
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={15} />
+          ) : (
+            <PanelLeftClose size={15} />
+          )}
+        </button>
+      ) : null}
       <div className="shrink-0 border-t border-sidebar-line px-3 py-2.5">
         <div
           className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2`}

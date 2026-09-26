@@ -114,7 +114,7 @@ export function MembersPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-5 py-6">
+    <div className="mx-auto w-full">
       <PageHeader
         title="Members"
         subtitle={`${members.length} people in this workspace`}

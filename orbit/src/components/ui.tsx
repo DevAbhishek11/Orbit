@@ -242,7 +242,7 @@ export function Segmented<T extends string>({
   const h = size === "sm" ? "h-7" : "h-8";
   return (
     <div
-      className={`inline-flex items-center gap-0.5 rounded-lg border border-line bg-sunken p-0.5`}
+      className={`inline-flex items-center gap-0.5 rounded-[9px] border border-line bg-sunken p-0.5`}
       role="tablist"
     >
       {options.map((opt) => {

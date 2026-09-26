@@ -21,7 +21,7 @@ export function ComponentsGallery() {
   const [search, setSearch] = useState("");
 
   return (
-    <div className="mx-auto w-full max-w-[1100px] px-5 py-6">
+    <div className="mx-auto w-full">
       <PageHeader
         title="Component Gallery"
         subtitle="The Orbit design system — one consistent set of Tailwind-based primitives."

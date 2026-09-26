@@ -31,7 +31,7 @@ export function AnalyticsPage() {
   const kpis = overviewQuery.data?.kpis;
 
   return (
-    <div className="mx-auto w-full max-w-[1100px] px-5 py-6">
+    <div className="mx-auto w-full">
       <PageHeader
         title="Analytics & Metrics"
         subtitle={

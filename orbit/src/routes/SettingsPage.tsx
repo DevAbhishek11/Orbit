@@ -127,7 +127,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-5 py-6">
+    <div className="mx-auto w-full">
       <PageHeader
         title="My settings"
         subtitle="Profile, notifications and active sessions"

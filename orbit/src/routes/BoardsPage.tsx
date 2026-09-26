@@ -160,7 +160,7 @@ export function BoardsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-5 py-6">
+    <div className="mx-auto w-full">
       {/* Hero */}
       <section className="relative mb-6 overflow-hidden rounded-2xl border border-line bg-sidebar px-6 py-6 text-sidebar-strong">
         <div
